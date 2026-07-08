@@ -1,0 +1,29 @@
+import { useState } from 'react'
+import Dashboard from './components/Dashboard'
+import Absences from './components/Absences'
+import Scolarite from './components/Scolarite'
+import type { User } from './types'
+
+const MOCK_USER: User = {
+  id: 'u1',
+  nom: 'Koffi',
+  prenom: 'Directeur',
+  email: 'directeur@lycee-behanzin.bj',
+  telephone: '+229 96 00 00 00',
+  role: 'directeur',
+  ecoleId: 'ec-1',
+  langue: 'fr',
+  createdAt: '2024-09-01',
+}
+
+export default function App() {
+  const [route, setRoute] = useState('/')
+
+  if (route === '/absences') {
+    return <Absences enseignantId="u1" onBack={() => setRoute('/')} isOnline={navigator.onLine} />
+  }
+  if (route === '/scolarite') {
+    return <Scolarite ecoleId="ec-1" onBack={() => setRoute('/')} isOnline={navigator.onLine} />
+  }
+  return <Dashboard user={MOCK_USER} onNavigate={setRoute} />
+}
