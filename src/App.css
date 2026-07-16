@@ -1,8 +1,38 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { AirtableService, calculerRapportsFinanciers } from './services/airtable'
+import type { EleveRaw, PaiementRaw } from './services/airtable'
+
+// Importations des vues Directeur
 import Dashboard from './components/Dashboard'
 import Absences from './components/Absences'
 import Scolarite from './components/Scolarite'
+
+// Importations des autres vues (Enseignant / Comptable) si présentes
+import FaireAppel from './components/enseignant/FaireAppel'
+import SaisieNotes from './components/enseignant/SaisieNotes'
+import CahierTexte from './components/enseignant/CahierTexte'
+import Encaissement from './components/comptable/Encaissement'
+import SuiviRelances from './components/comptable/SuiviRelances'
+import ImportBanque from './components/comptable/ImportBanque'
+
 import type { User } from './types'
+
+// Types de navigation
+type Vue =
+  | 'directeur'
+  | 'directeur/absences'
+  | 'directeur/scolarite'
+  | 'enseignant'
+  | 'enseignant/appel'
+  | 'enseignant/notes'
+  | 'enseignant/cahier'
+  | 'comptable'
+  | 'comptable/encaissement'
+  | 'comptable/relances'
+  | 'comptable/import'
+  | 'comptable/export'
+
+type Profil = 'directeur' | 'enseignant' | 'comptable'
 
 const MOCK_USER: User = {
   id: 'u1',
@@ -17,13 +47,81 @@ const MOCK_USER: User = {
 }
 
 export default function App() {
-  const [route, setRoute] = useState('/')
+  const [vue, setVue] = useState<Vue>('directeur')
+  const [profil, setProfil] = useState<Profil>('directeur')
 
-  if (route === '/absences') {
-    return <Absences enseignantId="u1" onBack={() => setRoute('/')} isOnline={navigator.onLine} />
+  // ── ÉTATS POUR LES DONNÉES AIRTABLE ──
+  const [eleves, setEleves] = useState<EleveRaw[]>([])
+  const [paiements, setPaiements] = useState<PaiementRaw[]>([])
+  const [absences, setAbsences] = useState<any[]>([])
+  const [chargement, setChargement] = useState<boolean>(true)
+
+  // ── CHARGEMENT DEPUIS AIRTABLE AU DÉMARRAGE ──
+  useEffect(() => {
+    async function chargerDonnees() {
+      try {
+        setChargement(true)
+        const [rawEleves, rawPaiements, rawAbsences] = await Promise.all([
+          AirtableService.getEleves(),
+          AirtableService.getPaiements(),
+          AirtableService.getAbsences()
+        ])
+        
+        setEleves(rawEleves)
+        setPaiements(rawPaiements)
+        setAbsences(rawAbsences)
+      } catch (error) {
+        console.error("Erreur de chargement initial :", error)
+      } finally {
+        setChargement(false)
+      }
+    }
+
+    chargerDonnees()
+  }, [])
+
+  // ── CALCUL DE L'INTELLIGENCE D'AFFAIRES DANS REACT ──
+  const rapportsPaiementsCalcules = calculerRapportsFinanciers(eleves, paiements)
+
+  function handleProfilChange(p: Profil) {
+    setProfil(p)
+    setVue(p)
   }
-  if (route === '/scolarite') {
-    return <Scolarite ecoleId="ec-1" onBack={() => setRoute('/')} isOnline={navigator.onLine} />
+
+  function handleNavigate(route: string) {
+    if (route === '/absences') setVue('directeur/absences')
+    if (route === '/scolarite') setVue('directeur/scolarite')
+    if (route === '/') setVue('directeur')
   }
-  return <Dashboard user={MOCK_USER} onNavigate={setRoute} />
+
+  // Écran d'attente pendant la récupération des données
+  if (chargement) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 24, marginBottom: 10 }}>⚡</div>
+          <div>Chargement des données EduConnect...</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Rendu conditionnel des écrans selon l'état de la vue
+  return (
+    <div className="app-container">
+      {vue === 'directeur/absences' && (
+        <Absences enseignantId="u1" onBack={() => handleNavigate('/')} isOnline={navigator.onLine} />
+      )}
+      
+      {vue === 'directeur/scolarite' && (
+        <Scolarite ecoleId="ec-1" onBack={() => handleNavigate('/')} isOnline={navigator.onLine} />
+      )}
+      
+      {vue === 'directeur' && (
+        <Dashboard user={MOCK_USER} onNavigate={handleNavigate} />
+      )}
+
+      {/* Ajoute ici tes autres vues (enseignant, comptable) si nécessaire */}
+    </div>
+  )
 }
