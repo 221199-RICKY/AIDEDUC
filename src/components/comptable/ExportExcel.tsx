@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
-import { supabase } from '../../supabaseClient'
+import { supabase } from '../../utils/supabaseClient'
 
 interface ExportExcelProps {
   onBack: () => void
@@ -22,7 +22,6 @@ export default function ExportExcel({ onBack }: ExportExcelProps) {
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Charger les données depuis Supabase dès l'ouverture de l'écran
   useEffect(() => {
     fetchPayments()
   }, [])
@@ -32,7 +31,7 @@ export default function ExportExcel({ onBack }: ExportExcelProps) {
     setError(null)
     try {
       const { data: payments, error: sbError } = await supabase
-        .from('paiements') // Nom de votre table dans Supabase
+        .from('paiements')
         .select('*')
         .order('date', { ascending: false })
 
@@ -47,14 +46,12 @@ export default function ExportExcel({ onBack }: ExportExcelProps) {
     }
   }
 
-  // Génération et téléchargement du fichier Excel
   const triggerExcelExport = () => {
     if (data.length === 0) return
     
     setExporting(true)
 
     try {
-      // 1. Nettoyage des données pour le tableur (rendre les colonnes jolies pour Excel)
       const formattedData = data.map((item, index) => ({
         'N° Séquence': index + 1,
         'Date Opération': item.date,
@@ -65,16 +62,13 @@ export default function ExportExcel({ onBack }: ExportExcelProps) {
         'Identifiant Unique': item.id
       }))
 
-      // 2. Création du classeur SheetJS
       const worksheet = XLSX.utils.json_to_sheet(formattedData)
       const workbook = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Journal des Paiements')
 
-      // 3. Ajustement automatique de la largeur des colonnes
       const maxProps = [{ wch: 12 }, { wch: 15 }, { wch: 35 }, { wch: 15 }, { wch: 20 }, { wch: 22 }, { wch: 20 }]
       worksheet['!cols'] = maxProps
 
-      // 4. Lancement du téléchargement immédiat dans le navigateur
       const fileName = `AIDEDUC_Journal_Comptable_${new Date().toISOString().split('T')[0]}.xlsx`
       XLSX.writeFile(workbook, fileName)
 
@@ -88,13 +82,11 @@ export default function ExportExcel({ onBack }: ExportExcelProps) {
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: '#F8FAFC', minHeight: '100vh', maxWidth: 480, margin: '0 auto', padding: '16px', boxShadow: '0 0 20px rgba(0,0,0,0.05)' }}>
-      {/* Barre de retour */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px', color: '#1A1A2E' }}>←</button>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1A1A2E', margin: 0 }}>Export des journaux</h2>
       </div>
 
-      {/* Carte d'action principale */}
       <div style={{ background: '#FFF', borderRadius: 16, padding: 20, border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', marginBottom: 20, textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1A1A2E', margin: '0 0 6px 0' }}>Extraction Excel</h3>
@@ -123,14 +115,12 @@ export default function ExportExcel({ onBack }: ExportExcelProps) {
         </button>
       </div>
 
-      {/* Gestion des erreurs */}
       {error && (
         <div style={{ padding: 12, borderRadius: 10, backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FCA5A5', fontSize: 13, marginBottom: 20 }}>
           ⚠️ {error}
         </div>
       )}
 
-      {/* État de chargement ou liste miniature des écritures prêtes pour l'export */}
       <div style={{ fontSize: 12, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>
         Derniers flux synchronisés
       </div>

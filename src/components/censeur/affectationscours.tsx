@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../../utils/supabaseClient'
 
 interface Enseignant {
@@ -22,9 +22,6 @@ interface Affectation {
   teacher_id: string
   class_id: string
   subject_id: string
-  teacher_name?: string
-  class_name?: string
-  subject_name?: string
 }
 
 interface Props {
@@ -46,7 +43,6 @@ export default function AffectationsCours({ onBack }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  // ── 1. CHARGEMENT DES CLASSES, MATIÈRES ET ENSEIGNANTS ──
   useEffect(() => {
     chargerDonnees()
   }, [])
@@ -56,82 +52,57 @@ export default function AffectationsCours({ onBack }: Props) {
       setLoading(true)
       setErrorMessage(null)
 
-      // Récupération des Enseignants (Profiles ayant le rôle enseignant)
-      const { data: dataEnseignants, error: errEns } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('role', 'enseignant')
-
-      if (errEns) console.error('Erreur enseignants:', errEns)
-
-      // Récupération des Classes
-      const { data: dataClasses, error: errClass } = await supabase
-        .from('classes')
-        .select('id, nom')
-
-      if (errClass) console.error('Erreur classes:', errClass)
-
-      // Récupération des Matières
-      const { data: dataMatieres, error: errMat } = await supabase
-        .from('matieres')
-        .select('id, nom')
-
-      if (errMat) console.error('Erreur matieres:', errMat)
-
-      // Récupération des Affectations existantes
-      const { data: dataAffectations, error: errAff } = await supabase
-        .from('affectations')
-        .select('*')
-
-      if (errAff) console.error('Erreur affectations:', errAff)
+      const [{ data: dataEnseignants }, { data: dataClasses }, { data: dataMatieres }, { data: dataAffectations }] =
+        await Promise.all([
+          supabase.from('profiles').select('id, first_name, last_name').eq('role', 'enseignant'),
+          supabase.from('classes').select('id, nom'),
+          supabase.from('matieres').select('id, nom'),
+          supabase.from('affectations').select('*'),
+        ])
 
       setEnseignants(dataEnseignants || [])
       setClasses(dataClasses || [])
       setMatieres(dataMatieres || [])
       setAffectations(dataAffectations || [])
-
     } catch (err: any) {
-      setErrorMessage("Impossible de charger les listes de sélection.")
+      setErrorMessage('Impossible de charger les listes de sélection.')
     } finally {
       setLoading(false)
     }
   }
 
-  // ── 2. SOUMISSION D'UNE NOUVELLE AFFECTATION ──
   async function handleAssign(e: React.FormEvent) {
     e.preventDefault()
     setErrorMessage(null)
     setSuccessMessage(null)
 
     if (!selectedEnseignant || !selectedClasse || !selectedMatiere) {
-      setErrorMessage("Veuillez sélectionner un enseignant, une classe et une matière.")
+      setErrorMessage('Veuillez sélectionner un enseignant, une classe et une matière.')
       return
     }
 
     try {
       setSubmitting(true)
 
-      const { data, error } = await supabase
-        .from('affectations')
-        .insert([
+      const { error } = await supabase.from('affectations').upsert(
+        [
           {
             teacher_id: selectedEnseignant,
             class_id: selectedClasse,
-            subject_id: selectedMatiere
-          }
-        ])
-        .select()
+            subject_id: selectedMatiere,
+          },
+        ],
+        { onConflict: 'teacher_id,class_id,subject_id' }
+      )
 
       if (error) throw error
 
-      setSuccessMessage("Affectation enregistrée avec succès !")
+      setSuccessMessage('Affectation enregistrée avec succès !')
       setSelectedEnseignant('')
       setSelectedClasse('')
       setSelectedMatiere('')
 
-      // Recharger la liste
-      chargerDonnees()
-
+      await chargerDonnees()
     } catch (err: any) {
       setErrorMessage(err.message || "Erreur lors de l'enregistrement de l'affectation.")
     } finally {
@@ -139,19 +110,18 @@ export default function AffectationsCours({ onBack }: Props) {
     }
   }
 
-  // Helper pour trouver les noms
   const getEnseignantName = (id: string) => {
-    const ens = enseignants.find(e => e.id === id)
-    return ens ? `${ens.first_name} ${ens.last_name}` : id
+    const ens = enseignants.find((e) => e.id === id)
+    return ens ? `${ens.first_name || ''} ${ens.last_name || ''}`.trim() : id
   }
 
   const getClasseName = (id: string) => {
-    const cl = classes.find(c => c.id === id)
+    const cl = classes.find((c) => c.id === id)
     return cl ? cl.nom : id
   }
 
   const getMatiereName = (id: string) => {
-    const m = matieres.find(mat => mat.id === id)
+    const m = matieres.find((mat) => mat.id === id)
     return m ? m.nom : id
   }
 
@@ -165,7 +135,7 @@ export default function AffectationsCours({ onBack }: Props) {
           </p>
         </div>
         {onBack && (
-          <button 
+          <button
             onClick={onBack}
             style={{ padding: '8px 14px', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}
           >
@@ -176,25 +146,20 @@ export default function AffectationsCours({ onBack }: Props) {
 
       {loading ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-          ⏳ Chargement des classes, matières et enseignants...
+          ⏳ Chargement des données...
         </div>
       ) : (
         <>
-          {/* FORMULAIRE D'AFFECTATION */}
           <form onSubmit={handleAssign} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', backgroundColor: '#f8fafc', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
-            
-            {/* Sélection Enseignant */}
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
-                Enseignant
-              </label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Enseignant</label>
               <select
                 value={selectedEnseignant}
                 onChange={(e) => setSelectedEnseignant(e.target.value)}
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff' }}
               >
                 <option value="">-- Sélectionner un enseignant --</option>
-                {enseignants.map(ens => (
+                {enseignants.map((ens) => (
                   <option key={ens.id} value={ens.id}>
                     {ens.first_name} {ens.last_name}
                   </option>
@@ -202,7 +167,6 @@ export default function AffectationsCours({ onBack }: Props) {
               </select>
             </div>
 
-            {/* Sélection Classe */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
                 Classe ({classes.length} disponibles)
@@ -213,7 +177,7 @@ export default function AffectationsCours({ onBack }: Props) {
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff' }}
               >
                 <option value="">-- Sélectionner une classe --</option>
-                {classes.map(c => (
+                {classes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nom}
                   </option>
@@ -221,7 +185,6 @@ export default function AffectationsCours({ onBack }: Props) {
               </select>
             </div>
 
-            {/* Sélection Matière */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
                 Matière ({matieres.length} disponibles)
@@ -232,7 +195,7 @@ export default function AffectationsCours({ onBack }: Props) {
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff' }}
               >
                 <option value="">-- Sélectionner une matière --</option>
-                {matieres.map(m => (
+                {matieres.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.nom}
                   </option>
@@ -240,7 +203,6 @@ export default function AffectationsCours({ onBack }: Props) {
               </select>
             </div>
 
-            {/* Bouton de validation */}
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button
                 type="submit"
@@ -252,7 +214,6 @@ export default function AffectationsCours({ onBack }: Props) {
             </div>
           </form>
 
-          {/* MESSAGES D'ALERTE */}
           {errorMessage && (
             <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '12px', borderRadius: '6px', marginBottom: '20px', fontSize: '14px' }}>
               ❌ {errorMessage}
@@ -265,7 +226,6 @@ export default function AffectationsCours({ onBack }: Props) {
             </div>
           )}
 
-          {/* TABLEAU DES AFFECTATIONS EXISTANTES */}
           <h3 style={{ fontSize: '16px', color: '#1e293b', marginBottom: '12px' }}>Liste des affectations actuelles</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
             <thead>
@@ -279,11 +239,11 @@ export default function AffectationsCours({ onBack }: Props) {
               {affectations.length === 0 ? (
                 <tr>
                   <td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>
-                    Aucune affectation enregistrée pour le moment.
+                    Aucune affectation enregistrée.
                   </td>
                 </tr>
               ) : (
-                affectations.map(aff => (
+                affectations.map((aff) => (
                   <tr key={aff.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '10px', fontWeight: '500' }}>{getEnseignantName(aff.teacher_id)}</td>
                     <td style={{ padding: '10px' }}>{getClasseName(aff.class_id)}</td>

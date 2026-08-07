@@ -1,12 +1,11 @@
 import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
-import { supabase } from '../../App' // Ajuste le chemin selon l'emplacement exact de ton App.tsx
+import { supabase } from '../../utils/supabaseClient'
 
 interface VueImportProps {
   onBack: () => void
 }
 
-// ── Palette de Couleurs AIDEDUC ───────────────────────────
 const C = {
   primary:   '#1B3A5C',
   accent:    '#F5A623',
@@ -25,7 +24,6 @@ export default function VueImport({ onBack }: VueImportProps) {
   const [preview, setPreview] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Lecture et conversion du fichier Excel localement
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -35,7 +33,7 @@ export default function VueImport({ onBack }: VueImportProps) {
       try {
         const bstr = evt.target?.result
         const wb = XLSX.read(bstr, { type: 'binary' })
-        const wsname = wb.SheetNames[0] // Récupère la première feuille
+        const wsname = wb.SheetNames[0]
         const ws = wb.Sheets[wsname]
         const data = XLSX.utils.sheet_to_json(ws)
         
@@ -44,7 +42,7 @@ export default function VueImport({ onBack }: VueImportProps) {
           return
         }
         
-        setPreview(data) // Stocke l'ensemble des données
+        setPreview(data)
         setStatut(null)
       } catch (err) {
         setStatut({ type: 'error', msg: 'Erreur lors de la lecture du fichier Excel.' })
@@ -53,16 +51,13 @@ export default function VueImport({ onBack }: VueImportProps) {
     reader.readAsBinaryString(file)
   }
 
-  // Envoi des lignes converties dans la table Supabase
   async function enregistrerDansSupabase() {
     if (preview.length === 0) return
     setLoading(true)
     setStatut(null)
 
     try {
-      // 💡 Remplace 'votre_table_supabase' par le nom réel de ta table (ex: 'paiements')
-      // Assure-toi que les colonnes de ton Excel correspondent exactement aux champs Supabase
-      const { error } = await supabase.from('votre_table_supabase').insert(preview)
+      const { error } = await supabase.from('paiements').insert(preview)
 
       if (error) throw error
 
@@ -85,7 +80,6 @@ export default function VueImport({ onBack }: VueImportProps) {
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: C.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Barre d'en-tête */}
       <header style={{ background: C.primary, padding: '12px 16px 14px', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, width: 34, height: 34, cursor: 'pointer', color: '#fff', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -101,10 +95,8 @@ export default function VueImport({ onBack }: VueImportProps) {
         </div>
       </header>
 
-      {/* Contenu principal */}
       <main style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         
-        {/* Zone de téléversement (Drag & Drop / Sélection) */}
         <div style={{ background: C.surface, padding: '24px 20px', borderRadius: 14, border: `2px dashed ${C.purple}`, textAlign: 'center' }}>
           <span style={{ fontSize: 42 }}>📥</span>
           <div style={{ fontSize: 14, fontWeight: 700, marginTop: 10, color: '#1A1A2E' }}>
@@ -130,7 +122,6 @@ export default function VueImport({ onBack }: VueImportProps) {
           </label>
         </div>
 
-        {/* Notifications d'état */}
         {statut && (
           <div style={{ 
             background: statut.type === 'success' ? '#EAF3DE' : '#FEE2E2', 
@@ -142,7 +133,6 @@ export default function VueImport({ onBack }: VueImportProps) {
           </div>
         )}
 
-        {/* Panneau de validation et d'aperçu des données */}
         {preview.length > 0 && (
           <div style={{ background: C.surface, padding: 16, borderRadius: 14, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center' }}>
@@ -151,7 +141,6 @@ export default function VueImport({ onBack }: VueImportProps) {
               </div>
             </div>
 
-            {/* Tableau dynamique basé sur les colonnes du fichier Excel */}
             <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${C.border}` }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                 <thead>
@@ -182,7 +171,6 @@ export default function VueImport({ onBack }: VueImportProps) {
               )}
             </div>
 
-            {/* Bouton de confirmation finale */}
             <button 
               onClick={enregistrerDansSupabase}
               disabled={loading}

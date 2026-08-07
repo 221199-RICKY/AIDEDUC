@@ -29,7 +29,7 @@ export interface AbsenceRecord {
   date: string
   eleve_nom: string
   eleve_prenom: string
-  type: 'absence' | 'retard'
+  statut: 'present' | 'absent' | 'retard'
   motif: string
   justifie: boolean
   creneau: string
@@ -44,17 +44,17 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
   const [selectedClasseId, setSelectedClasseId] = useState<string>('')
   const [absences, setAbsences] = useState<AbsenceRecord[]>([])
   const [loading, setLoading] = useState<boolean>(true)
-  const [filtreType, setFiltreType] = useState<'tous' | 'absence' | 'retard'>('tous')
+  const [filtreStatut, setFiltreStatut] = useState<'tous' | 'absent' | 'retard'>('tous')
 
-  // Chargement des classes
+  // Chargement des classes depuis la table `classes`
   useEffect(() => {
     async function fetchClasses() {
       try {
-        const { data, error } = await supabase.from('schools').select('id, nom').order('nom')
+        const { data, error } = await supabase.from('classes').select('id, nom').order('nom')
         if (error) throw error
         if (data) {
           setClasses(data)
-          if (data.length > 0) setSelectedClasseId(data[0].id)
+          if (data.length > 0) setSelectedClasseId(String(data[0].id))
         }
       } catch (err) {
         console.error('Erreur chargement classes:', err)
@@ -63,7 +63,7 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
     fetchClasses()
   }, [])
 
-  // Chargement des absences selon la classe
+  // Chargement des absences de la classe sélectionnée
   useEffect(() => {
     if (!selectedClasseId) return
 
@@ -72,21 +72,21 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
       try {
         const { data, error } = await supabase
           .from('absences')
-          .select('id, date, type, motif, justifie, creneau, students (nom, prenom)')
-          .eq('classe_id', selectedClasseId)
+          .select('id, date, statut, motif, justifie, time_slot, students (nom, prenom, first_name, last_name)')
+          .eq('class_id', selectedClasseId)
           .order('date', { ascending: false })
 
         if (error) throw error
 
-        const formatted = (data || []).map((item: any) => ({
-          id: item.id,
+        const formatted: AbsenceRecord[] = (data || []).map((item: any) => ({
+          id: String(item.id),
           date: item.date,
-          type: item.type,
+          statut: item.statut || 'absent',
           motif: item.motif || 'Non spécifié',
-          justifie: item.justifie,
-          creneau: item.creneau || 'Journée',
-          eleve_nom: item.students?.nom || '',
-          eleve_prenom: item.students?.prenom || '',
+          justifie: Boolean(item.justifie),
+          creneau: item.time_slot || 'Journée',
+          eleve_nom: item.students?.nom || item.students?.last_name || '',
+          eleve_prenom: item.students?.prenom || item.students?.first_name || '',
         }))
 
         setAbsences(formatted)
@@ -119,14 +119,14 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
   }
 
   const listFiltered = useMemo(() => {
-    if (filtreType === 'tous') return absences
-    return absences.filter((a) => a.type === filtreType)
-  }, [absences, filtreType])
+    if (filtreStatut === 'tous') return absences.filter((a) => a.statut !== 'present')
+    return absences.filter((a) => a.statut === filtreStatut)
+  }, [absences, filtreStatut])
 
   const stats = useMemo(() => {
-    const totalAbsences = absences.filter((a) => a.type === 'absence').length
-    const totalRetards = absences.filter((a) => a.type === 'retard').length
-    const nonJustifies = absences.filter((a) => !a.justifie).length
+    const totalAbsences = absences.filter((a) => a.statut === 'absent').length
+    const totalRetards = absences.filter((a) => a.statut === 'retard').length
+    const nonJustifies = absences.filter((a) => a.statut !== 'present' && !a.justifie).length
     return { totalAbsences, totalRetards, nonJustifies }
   }, [absences])
 
@@ -136,7 +136,7 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
         fontFamily: "'Inter', system-ui, sans-serif",
         background: PALETTE.bg,
         minHeight: '100vh',
-        maxWidth: 480,
+        maxWidth: 600,
         margin: '0 auto',
       }}
     >
@@ -243,24 +243,24 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
 
         {/* FILTRES */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          {(['tous', 'absence', 'retard'] as const).map((type) => (
+          {(['tous', 'absent', 'retard'] as const).map((st) => (
             <button
-              key={type}
-              onClick={() => setFiltreType(type)}
+              key={st}
+              onClick={() => setFiltreStatut(st)}
               style={{
                 flex: 1,
                 padding: '6px 0',
                 borderRadius: 8,
                 border: 'none',
-                background: filtreType === type ? PALETTE.primary : PALETTE.surface,
-                color: filtreType === type ? '#fff' : PALETTE.textMuted,
+                background: filtreStatut === st ? PALETTE.primary : PALETTE.surface,
+                color: filtreStatut === st ? '#fff' : PALETTE.textMuted,
                 fontSize: 11,
                 fontWeight: 600,
                 textTransform: 'capitalize',
                 cursor: 'pointer',
               }}
             >
-              {type}s
+              {st === 'tous' ? 'Tous' : `${st}s`}
             </button>
           ))}
         </div>
@@ -268,11 +268,11 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
         {/* LISTE */}
         {loading ? (
           <div style={{ textAlign: 'center', color: PALETTE.textMuted, padding: 20 }}>
-            Chargement...
+            Chargement des données...
           </div>
         ) : listFiltered.length === 0 ? (
           <div style={{ textAlign: 'center', color: PALETTE.textMuted, padding: 20 }}>
-            Aucun enregistrement trouvé.
+            Aucune absence ou retard répertorié.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -308,11 +308,11 @@ export default function GestionAbsencesCenseur({ onBack }: Props) {
                       fontWeight: 700,
                       padding: '3px 8px',
                       borderRadius: 12,
-                      background: item.type === 'absence' ? '#FCEBEB' : '#FAEEDA',
-                      color: item.type === 'absence' ? PALETTE.red : PALETTE.amber,
+                      background: item.statut === 'absent' ? '#FCEBEB' : '#FAEEDA',
+                      color: item.statut === 'absent' ? PALETTE.red : PALETTE.amber,
                     }}
                   >
-                    {item.type.toUpperCase()}
+                    {item.statut.toUpperCase()}
                   </span>
 
                   <button

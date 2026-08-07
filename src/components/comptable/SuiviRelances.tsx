@@ -1,8 +1,3 @@
-// ─────────────────────────────────────────────
-// AIDEDUC — SuiviRelances.tsx
-// src/components/comptable/SuiviRelances.tsx
-// ─────────────────────────────────────────────
-
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../utils/supabaseClient'
 
@@ -51,7 +46,6 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day:'numeric', month:'short' })
 }
 
-// ── Message dynamique avec nom de l'école ──
 function buildMsg(i: Impaye): string {
   const reste = i.totalDu - i.totalPaye
   const ecole = i.nomEcole && i.nomEcole.trim() !== '' ? i.nomEcole : 'notre établissement'
@@ -85,7 +79,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
       try {
         setLoading(true)
 
-        // Récupération simultanée avec extraction d'erreur pour school
         const [
           { data: schoolData, error: errSchool },
           { data: classesData, error: errC },
@@ -93,7 +86,7 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
           { data: scolariteData, error: errS },
           { data: paiementsData, error: errP },
         ] = await Promise.all([
-          supabase.from('schools').select('*'), // On sélectionne tout pour éviter tout problème de colonne
+          supabase.from('schools').select('*'),
           supabase.from('classes').select('id, nom'),
           supabase.from('students').select('*'),
           supabase.from('scolarite').select('*'),
@@ -106,17 +99,12 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
         if (errS) throw errS
         if (errP) throw errP
 
-        // Debug dans la console F12 pour vérifier le contenu de la table school
-        console.log('Données enregistrées dans school :', schoolData)
-
-        // Dictionnaire des écoles (si plusieurs enregistrements)
         const schoolMap = new Map<string, string>()
         schoolData?.forEach(s => {
           const nom = s.nom ?? s.name ?? s.nom_ecole ?? ''
           if (s.id) schoolMap.set(String(s.id), nom)
         })
 
-        // Nom par défaut (premier élément de la table school)
         const nomEcoleGlobal = schoolData && schoolData.length > 0
           ? (schoolData[0].nom ?? schoolData[0].name ?? schoolData[0].nom_ecole ?? '')
           : ''
@@ -140,7 +128,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
 
           const reste = totalDu - totalPaye
 
-          // Détermination du nom de l'école (par élève s'il y a un school_id, sinon le nom global)
           const eleveSchoolId = eleve.school_id ? String(eleve.school_id) : null
           const nomEcoleEleve = (eleveSchoolId && schoolMap.has(eleveSchoolId))
             ? schoolMap.get(eleveSchoolId)!
@@ -152,6 +139,7 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
               elevePrenom: eleve.prenom ?? eleve.Prenom ?? '',
               eleveNom: eleve.nom ?? eleve.Nom ?? '',
               classe: classeNom,
+              numero: eleve.matricule ?? eleve.numero ?? eleve.telephone ?? '',
               parentNom: eleve.parent_nom ?? eleve.parentNom ?? 'M./Mme Parent',
               parentTel: eleve.parent_tel ?? eleve.parentTel ?? eleve.telephone ?? '',
               nomEcole: nomEcoleEleve,
@@ -224,7 +212,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", background:C.bg, minHeight:'100vh', maxWidth:480, margin:'0 auto', display:'flex', flexDirection:'column' }}>
 
-      {/* HEADER */}
       <header style={{ background:C.primary, padding:'12px 16px 14px', position:'sticky', top:0, zIndex:50 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
           <button onClick={onBack} style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:8, width:34, height:34, cursor:'pointer', color:'#fff', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }} aria-label="Retour">←</button>
@@ -253,7 +240,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
 
       <main style={{ flex:1, padding:'14px 16px 28px', display:'flex', flexDirection:'column', gap:12 }}>
 
-        {/* KPIs */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
           {[
             { label:'Total impayé', value:formatXOF(stats.totalReste), color:C.red   },
@@ -267,7 +253,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
           ))}
         </div>
 
-        {/* Filtres */}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           {([
             { id:'tous',     label:`Tous (${impayes.length})`                                            },
@@ -284,14 +269,12 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
           ))}
         </div>
 
-        {/* Badge relances envoyées */}
         {relancees.size > 0 && (
           <div style={{ background:'#EAF3DE', border:'1px solid #97C459', borderRadius:10, padding:'10px 14px', fontSize:12, color:'#27500A', fontWeight:500 }}>
             ✅ {relancees.size} relance{relancees.size>1?'s':''} WhatsApp envoyée{relancees.size>1?'s':''} cette session
           </div>
         )}
 
-        {/* Liste */}
         {liste.length === 0 ? (
           <div style={{ textAlign:'center', padding:'40px 20px', color:C.textMuted, fontSize:13 }}>
             <div style={{ fontSize:40, marginBottom:10 }}>✅</div>
@@ -310,7 +293,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
               return (
                 <div key={i.id} style={{ background:C.surface, border:`1px solid ${dejaRel?'#97C459':cfg.border}`, borderLeft:`4px solid ${dejaRel?C.green:cfg.color}`, borderRadius:12, overflow:'hidden', transition:'border-color 0.2s' }}>
 
-                  {/* Ligne principale */}
                   <div onClick={() => setExpanded(isOpen ? null : i.id)} style={{ padding:'12px 14px', cursor:'pointer', display:'flex', alignItems:'center', gap:10 }}>
                     <div style={{ width:38, height:38, borderRadius:'50%', background:dejaRel?'#EAF3DE':cfg.bg, color:dejaRel?'#27500A':cfg.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, flexShrink:0 }}>
                       {i.elevePrenom[0]}{i.eleveNom[0]}
@@ -329,11 +311,9 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
                     <span style={{ fontSize:14, color:'#C0C8D0', flexShrink:0, transition:'transform 0.2s', display:'inline-block', transform:isOpen?'rotate(90deg)':'none' }}>›</span>
                   </div>
 
-                  {/* Détail déroulant */}
                   {isOpen && (
                     <div style={{ borderTop:`1px solid ${C.border}`, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
 
-                      {/* Barre progression */}
                       <div>
                         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
                           <span style={{ fontSize:11, color:C.textMuted }}>Versé : {formatXOF(i.totalPaye)} / {formatXOF(i.totalDu)}</span>
@@ -344,7 +324,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
                         </div>
                       </div>
 
-                      {/* Infos parent */}
                       <div style={{ background:'#F8FAFC', borderRadius:8, padding:'10px 12px', display:'flex', flexDirection:'column', gap:5 }}>
                         {[
                           { label:'Parent / Tuteur',   value: i.parentNom },
@@ -360,7 +339,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
                         ))}
                       </div>
 
-                      {/* Aperçu message */}
                       <div style={{ background:'#F0FBF6', border:'1px solid #97C459', borderRadius:8, padding:'10px 12px' }}>
                         <div style={{ fontSize:10, fontWeight:700, color:'#27500A', marginBottom:5 }}>
                           📲 Message WhatsApp pré-rempli
@@ -370,7 +348,6 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
                         </div>
                       </div>
 
-                      {/* Bouton WhatsApp */}
                       <button onClick={() => relancer(i)} style={{
                         width:'100%', padding:'13px 0', borderRadius:10, border:'none',
                         background: dejaRel ? '#1DA851' : C.whatsapp,
