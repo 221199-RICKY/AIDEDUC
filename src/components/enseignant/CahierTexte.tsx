@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────
-// AIDEDUC — CahierTexte.tsx
+// AIDEDUC — CahierTexte.tsx (Version Enseignant)
 // src/components/enseignant/CahierTexte.tsx
-// Saisie du résumé de cours + devoirs donnés
 // ─────────────────────────────────────────────
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { supabase } from '../../utils/supabaseClient'
 
 // ── Palette AIDEDUC ───────────────────────────
 const C = {
@@ -19,54 +19,39 @@ const C = {
   textMuted: '#6C757D',
 }
 
-// ── Types ─────────────────────────────────────
+// ── Interfaces ────────────────────────────────
 interface Classe {
   id: string
   nom: string
   matiere: string
+  salle?: string
 }
 
 interface EntreeCahier {
   id: string
-  classeId: string
-  date: string        // ISO "2026-06-30"
+  classe_id: string
+  date: string        // ISO "2026-07-20"
+  trimestre: string   // "1er Trimestre", etc.
+  titre_chapitre?: string
   contenu: string
   devoir?: string
-  auteur: string
+  statut: 'en_cours' | 'termine' | 'valide'
+  auteur?: string
+  matiere?: string
 }
 
-// ── Données de démo ───────────────────────────
-const CLASSES: Classe[] = [
-  { id: 'cl-1', nom: 'Terminale C', matiere: 'Mathématiques'   },
-  { id: 'cl-2', nom: 'Première D',  matiere: 'Physique-Chimie' },
-  { id: 'cl-3', nom: '2nde B',      matiere: 'Mathématiques'   },
-]
-
-const INIT_ENTREES: EntreeCahier[] = [
-  {
-    id: 'c1', classeId: 'cl-1',
-    date: '2026-06-25',
-    contenu: 'Suites arithmétiques : raison, terme général et somme des n premiers termes. Démonstration de la formule Sn = n(u₁+uₙ)/2.',
-    devoir: 'Exercices 12, 13 et 14 page 58 — à rendre lundi.',
-    auteur: 'M. Ouédraogo',
-  },
-  {
-    id: 'c2', classeId: 'cl-1',
-    date: '2026-06-23',
-    contenu: 'Introduction aux suites numériques. Définition, notation et premiers termes. Suites définies par récurrence.',
-    auteur: 'M. Ouédraogo',
-  },
-  {
-    id: 'c3', classeId: 'cl-2',
-    date: '2026-06-24',
-    contenu: 'Lois de Newton — révisions. Applications : plan incliné et dynamique du point matériel.',
-    devoir: 'Fiche d\'exercices distribuée en classe — correction vendredi.',
-    auteur: 'M. Ouédraogo',
-  },
-]
+interface AffectationRaw {
+  matiere: string
+  classes: {
+    id: string
+    nom: string
+    salle?: string
+  } | null
+}
 
 // ── Helpers ───────────────────────────────────
 function formatDate(iso: string): string {
+  if (!iso) return ''
   return new Date(iso).toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
@@ -76,74 +61,212 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+function getTrimestreActuel(): string {
+  const mois = new Date().getMonth() + 1
+  if (mois >= 9 && mois <= 12) {
+    return '1er Trimestre'
+  } else if (mois >= 1 && mois <= 3) {
+    return '2ème Trimestre'
+  } else {
+    return '3ème Trimestre'
+  }
+}
+
 // ── COMPOSANT ─────────────────────────────────
 interface CahierTexteProps {
   onBack: () => void
 }
 
 export default function CahierTexte({ onBack }: CahierTexteProps) {
-  const [classeId, setClasseId]   = useState(CLASSES[0].id)
-  const [entrees,  setEntrees]    = useState<EntreeCahier[]>(INIT_ENTREES)
-  const [showForm, setShowForm]   = useState(false)
+  const [classes,    setClasses]    = useState<Classe[]>([])
+  const [classeId,   setClasseId]   = useState<string>('')
+  const [entrees,    setEntrees]    = useState<EntreeCahier[]>([])
+  const [showForm,   setShowForm]   = useState(false)
+  const [chargement, setChargement] = useState(true)
 
   // Champs du formulaire
-  const [contenu,  setContenu]    = useState('')
-  const [devoir,   setDevoir]     = useState('')
-  const [saving,   setSaving]     = useState(false)
-  const [flash,    setFlash]      = useState(false)
+  const [titre,   setTitre]   = useState('')
+  const [contenu, setContenu] = useState('')
+  const [devoir,  setDevoir]  = useState('')
+  const [saving,  setSaving]  = useState(false)
+  const [flash,   setFlash]   = useState(false)
+
+  // Charger les classes et le cahier de texte depuis Supabase
+  useEffect(() => {
+    async function initialiserDonnees() {
+      try {
+        setChargement(true)
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+          console.error("Erreur d'authentification :", userError)
+          setChargement(false)
+          return
+        }
+
+        const profConnecteId = user.id
+
+        // 1. Charger les classes assignées au professeur
+        const { data: affectationsData, error: affError } = await supabase
+          .from('affectations_cours')
+          .select(`
+            matiere,
+            classes (
+              id,
+              nom,
+              salle
+            )
+          `)
+          .eq('prof_id', profConnecteId)
+
+        if (affError) throw affError
+
+        let classesProf: Classe[] = []
+        if (affectationsData && affectationsData.length > 0) {
+          const rawData = affectationsData as unknown as AffectationRaw[]
+          classesProf = rawData
+            .filter(item => item.classes !== null)
+            .map(item => ({
+              id: item.classes!.id,
+              nom: item.classes!.nom,
+              salle: item.classes!.salle,
+              matiere: item.matiere,
+            }))
+
+          setClasses(classesProf)
+          if (classesProf.length > 0) {
+            setClasseId(classesProf[0].id)
+          }
+        }
+
+        // 2. Charger l'historique du cahier de texte (Table: cahier_de_texte)
+        const { data: cahierData, error: cahierError } = await supabase
+          .from('cahier_de_texte')
+          .select('*')
+          .eq('prof_id', profConnecteId)
+          .order('date', { ascending: false })
+
+        if (cahierError) {
+          console.warn("Erreur de chargement des entrées :", cahierError.message)
+        } else if (cahierData) {
+          setEntrees(cahierData as EntreeCahier[])
+        }
+
+      } catch (error) {
+        console.error("Erreur d'initialisation :", error)
+      } finally {
+        setChargement(false)
+      }
+    }
+
+    initialiserDonnees()
+  }, [])
 
   const classe = useMemo(
-    () => CLASSES.find(c => c.id === classeId)!,
-    [classeId]
+    () => classes.find(c => c.id === classeId),
+    [classes, classeId]
   )
 
-  // Entrées filtrées par classe, ordre anti-chronologique
   const mesEntrees = useMemo(
-    () => entrees
-      .filter(e => e.classeId === classeId)
-      .sort((a, b) => b.date.localeCompare(a.date)),
+    () => entrees.filter(e => e.classe_id === classeId),
     [entrees, classeId]
   )
 
-  // Réinitialiser le formulaire
   function resetForm() {
+    setTitre('')
     setContenu('')
     setDevoir('')
     setShowForm(false)
   }
 
-  // Enregistrer une nouvelle entrée
+  // Enregistrer un nouveau cours
   async function enregistrer() {
-    if (!contenu.trim()) return
+    if (!contenu.trim() || !classe) return
     setSaving(true)
-    await new Promise(r => setTimeout(r, 800))
 
-    const nouvelle: EntreeCahier = {
-      id:       `c${Date.now()}`,
-      classeId,
-      date:     todayISO(),
-      contenu:  contenu.trim(),
-      devoir:   devoir.trim() || undefined,
-      auteur:   'M. Ouédraogo',
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Utilisateur non connecté")
+
+      const nouvelleEntree = {
+        classe_id: classe.id,
+        prof_id: user.id,
+        date: todayISO(),
+        trimestre: getTrimestreActuel(),
+        matiere: classe.matiere,
+        titre_chapitre: titre.trim() || `Séance de ${classe.matiere}`,
+        contenu: contenu.trim(),
+        devoir: devoir.trim() || null,
+        statut: 'termine', // Statut par défaut prêt pour visa du censeur
+        auteur: user.user_metadata?.full_name || 'Enseignant',
+      }
+
+      const { data, error } = await supabase
+        .from('cahier_de_texte')
+        .insert([nouvelleEntree])
+        .select()
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        setEntrees(prev => [data[0] as EntreeCahier, ...prev])
+      } else {
+        setEntrees(prev => [{ ...nouvelleEntree, id: `c_${Date.now()}` } as EntreeCahier, ...prev])
+      }
+
+      setFlash(true)
+      resetForm()
+      setTimeout(() => setFlash(false), 3000)
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement :", error)
+      alert("Une erreur est survenue lors de l'enregistrement.")
+    } finally {
+      setSaving(false)
     }
-
-    setEntrees(prev => [nouvelle, ...prev])
-    setSaving(false)
-    setFlash(true)
-    resetForm()
-    setTimeout(() => setFlash(false), 3000)
   }
 
   // Supprimer une entrée
-  function supprimer(id: string) {
-    if (window.confirm('Supprimer cette entrée ?')) {
+  async function supprimer(id: string) {
+    if (!window.confirm('Supprimer cette entrée du cahier de texte ?')) return
+
+    try {
+      const { error } = await supabase
+        .from('cahier_de_texte')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
       setEntrees(prev => prev.filter(e => e.id !== id))
+    } catch (error) {
+      console.error("Erreur de suppression :", error)
+      alert("Impossible de supprimer cette entrée.")
     }
   }
 
   const formValid = contenu.trim().length > 0
 
-  // ── RENDU ─────────────────────────────────
+  if (chargement) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: C.bg, color: C.textMuted }}>
+        <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>Chargement du cahier de texte...</p>
+      </div>
+    )
+  }
+
+  if (classes.length === 0 || !classe) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: C.bg, padding: 20, textAlign: 'center' }}>
+        <p style={{ fontFamily: "'Inter', sans-serif", color: C.textMuted, fontSize: 15, marginBottom: 16 }}>
+          Aucune classe assignée trouvée pour cet enseignant.
+        </p>
+        <button onClick={onBack} style={{ padding: '10px 20px', borderRadius: 8, background: C.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>
+          Retour
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       fontFamily: "'Inter', system-ui, sans-serif",
@@ -157,7 +280,6 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
         background: C.primary, padding: '12px 16px 14px',
         position: 'sticky', top: 0, zIndex: 50,
       }}>
-        {/* Marque + retour */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <button
             onClick={onBack}
@@ -183,7 +305,6 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
             </div>
           </div>
 
-          {/* Compteur entrées */}
           <div style={{
             fontSize: 11, padding: '3px 10px', borderRadius: 20,
             background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)',
@@ -211,9 +332,9 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
               appearance: 'none', cursor: 'pointer', outline: 'none',
             }}
           >
-            {CLASSES.map(c => (
+            {classes.map(c => (
               <option key={c.id} value={c.id} style={{ background: '#1B3A5C' }}>
-                {c.nom} — {c.matiere}
+                {c.nom} {c.matiere ? `— ${c.matiere}` : ''}
               </option>
             ))}
           </select>
@@ -223,12 +344,19 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
             pointerEvents: 'none', fontSize: 12,
           }}>▾</span>
         </div>
+
+        <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.7)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span>📅 {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <span>·</span>
+          <span>📘 {getTrimestreActuel()}</span>
+          {classe.salle && <span>·</span>}
+          {classe.salle && <span>📍 {classe.salle}</span>}
+        </div>
       </header>
 
       {/* ── CORPS ── */}
       <main style={{ flex: 1, padding: '14px 16px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* Flash succès */}
         {flash && (
           <div style={{
             background: '#EAF3DE', border: '1px solid #97C459',
@@ -236,11 +364,10 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
             fontSize: 13, color: '#27500A', fontWeight: 600,
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            ✅ Entrée ajoutée au cahier
+            ✅ Entrée ajoutée avec succès au cahier
           </div>
         )}
 
-        {/* Bouton ouvrir formulaire */}
         <button
           onClick={() => setShowForm(s => !s)}
           style={{
@@ -261,82 +388,69 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
             background: C.surface, borderRadius: 14,
             padding: 16, border: `1px solid ${C.border}`,
           }}>
-            {/* Date auto */}
             <div style={{
               fontSize: 12, fontWeight: 700, color: C.primary,
               marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              📅 {formatDate(todayISO())}
+              📅 {formatDate(todayISO())} · 📘 {getTrimestreActuel()}
             </div>
 
-            {/* Contenu du cours */}
-            <label htmlFor="contenu-cours" style={{
-              display: 'block', fontSize: 11, fontWeight: 700,
-              color: C.textMuted, textTransform: 'uppercase',
-              letterSpacing: '.4px', marginBottom: 6,
-            }}>
-              Résumé du cours *
+            {/* Titre du chapitre */}
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', marginBottom: 6 }}>
+              Titre du Chapitre / Leçon
             </label>
-            <textarea
-              id="contenu-cours"
-              value={contenu}
-              onChange={e => setContenu(e.target.value)}
-              placeholder={`Notions abordées en ${classe.matiere}, exercices traités en classe, points importants…`}
-              rows={5}
+            <input
+              type="text"
+              value={titre}
+              onChange={e => setTitre(e.target.value)}
+              placeholder="Ex: Chapitre 2 - Équations du second degré"
               style={{
-                width: '100%', padding: '10px 12px',
-                borderRadius: 9, fontSize: 13, lineHeight: 1.6,
-                border: `1.5px solid ${contenu ? C.primary : C.border}`,
-                outline: 'none', resize: 'vertical',
-                fontFamily: 'inherit', color: C.textMain,
-                transition: 'border-color 0.15s',
-                marginBottom: 12,
+                width: '100%', padding: '10px 12px', borderRadius: 9, fontSize: 13,
+                border: `1.5px solid ${C.border}`, outline: 'none', marginBottom: 12,
+                color: C.textMain
               }}
             />
 
-            {/* Compteur caractères */}
-            <div style={{
-              fontSize: 10, color: C.textMuted,
-              textAlign: 'right', marginTop: -10, marginBottom: 12,
-            }}>
-              {contenu.length} caractère{contenu.length > 1 ? 's' : ''}
-            </div>
+            {/* Contenu du cours */}
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', marginBottom: 6 }}>
+              Résumé du cours *
+            </label>
+            <textarea
+              value={contenu}
+              onChange={e => setContenu(e.target.value)}
+              placeholder={`Notions abordées en ${classe.matiere || 'cours'}, exercices traités en classe, points importants…`}
+              rows={5}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 9, fontSize: 13, lineHeight: 1.6,
+                border: `1.5px solid ${contenu ? C.primary : C.border}`, outline: 'none', resize: 'vertical',
+                fontFamily: 'inherit', color: C.textMain, marginBottom: 12,
+              }}
+            />
 
             {/* Devoir */}
-            <label htmlFor="devoir-donne" style={{
-              display: 'block', fontSize: 11, fontWeight: 700,
-              color: C.textMuted, textTransform: 'uppercase',
-              letterSpacing: '.4px', marginBottom: 6,
-            }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', marginBottom: 6 }}>
               Devoir donné <span style={{ fontWeight: 400, textTransform: 'none' }}>(optionnel)</span>
             </label>
             <input
-              id="devoir-donne"
               type="text"
               value={devoir}
               onChange={e => setDevoir(e.target.value)}
               placeholder="Ex : Exercices 12–14 page 58 — à rendre lundi"
               style={{
-                width: '100%', padding: '10px 12px',
-                borderRadius: 9, fontSize: 13,
-                border: `1.5px solid ${devoir ? C.amber : C.border}`,
-                outline: 'none', fontFamily: 'inherit', color: C.textMain,
-                transition: 'border-color 0.15s',
-                marginBottom: 16,
+                width: '100%', padding: '10px 12px', borderRadius: 9, fontSize: 13,
+                border: `1.5px solid ${devoir ? C.amber : C.border}`, outline: 'none',
+                fontFamily: 'inherit', color: C.textMain, marginBottom: 16,
               }}
             />
 
-            {/* Bouton enregistrer */}
             <button
               onClick={enregistrer}
               disabled={!formValid || saving}
               style={{
-                width: '100%', padding: '13px 0', borderRadius: 11,
-                border: 'none',
+                width: '100%', padding: '13px 0', borderRadius: 11, border: 'none',
                 background: !formValid ? '#D0D5DD' : saving ? '#85B7EB' : C.green,
                 color: '#fff', fontSize: 14, fontWeight: 700,
                 cursor: !formValid ? 'not-allowed' : saving ? 'wait' : 'pointer',
-                transition: 'background 0.15s',
               }}
             >
               {saving ? '⏳ Enregistrement…' : '📓 Ajouter au cahier'}
@@ -346,10 +460,7 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
 
         {/* ── LISTE DES ENTRÉES ── */}
         {mesEntrees.length === 0 ? (
-          <div style={{
-            textAlign: 'center', padding: '48px 24px',
-            color: C.textMuted, fontSize: 13,
-          }}>
+          <div style={{ textAlign: 'center', padding: '48px 24px', color: C.textMuted, fontSize: 13 }}>
             <div style={{ fontSize: 44, marginBottom: 12 }}>📓</div>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Cahier vide pour cette classe</div>
             <div>Ajoutez votre premier cours avec le bouton ci-dessus.</div>
@@ -360,62 +471,50 @@ export default function CahierTexte({ onBack }: CahierTexteProps) {
               <article
                 key={entry.id}
                 style={{
-                  background: C.surface,
-                  borderRadius: 14, padding: '13px 15px',
+                  background: C.surface, borderRadius: 14, padding: '13px 15px',
                   border: `1px solid ${C.border}`,
-                  borderLeft: `4px solid ${C.primary}`,
+                  borderLeft: `4px solid ${entry.statut === 'valide' ? C.green : C.primary}`,
                 }}
               >
-                {/* Date + bouton supprimer */}
-                <div style={{
-                  display: 'flex', alignItems: 'center',
-                  justifyContent: 'space-between', marginBottom: 8,
-                }}>
-                  <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>
-                    📅 {formatDate(entry.date)}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span>📅 {formatDate(entry.date)}</span>
+                    {entry.trimestre && <span>· 📘 {entry.trimestre}</span>}
                   </div>
-                  <button
-                    onClick={() => supprimer(entry.id)}
-                    aria-label="Supprimer cette entrée"
-                    style={{
-                      background: 'none', border: 'none',
-                      color: '#CCC', fontSize: 16, cursor: 'pointer',
-                      padding: '2px 4px', borderRadius: 4,
-                      lineHeight: 1,
-                    }}
-                    title="Supprimer"
-                  >
-                    ✕
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {entry.statut === 'valide' && (
+                      <span style={{ fontSize: 10, background: '#E6F4EA', color: C.green, padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                        ✓ Visé par le censeur
+                      </span>
+                    )}
+                    <button
+                      onClick={() => supprimer(entry.id)}
+                      style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 16, cursor: 'pointer' }}
+                      title="Supprimer"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
 
-                {/* Contenu */}
-                <p style={{
-                  fontSize: 13, color: C.textMain, lineHeight: 1.65,
-                  margin: 0,
-                  marginBottom: entry.devoir ? 10 : 0,
-                }}>
+                {entry.titre_chapitre && (
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: 14, fontWeight: 700, color: C.textMain }}>
+                    {entry.titre_chapitre}
+                  </h4>
+                )}
+
+                <p style={{ fontSize: 13, color: C.textMain, lineHeight: 1.65, margin: 0, marginBottom: entry.devoir ? 10 : 0 }}>
                   {entry.contenu}
                 </p>
 
-                {/* Devoir */}
                 {entry.devoir && (
-                  <div style={{
-                    background: '#FAEEDA', borderRadius: 8,
-                    padding: '8px 11px', marginTop: 8,
-                    display: 'flex', alignItems: 'flex-start', gap: 7,
-                  }}>
+                  <div style={{ background: '#FAEEDA', borderRadius: 8, padding: '8px 11px', marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 7 }}>
                     <span style={{ flexShrink: 0, fontSize: 14 }}>📚</span>
                     <span style={{ fontSize: 12, color: '#633806', fontWeight: 500, lineHeight: 1.5 }}>
                       {entry.devoir}
                     </span>
                   </div>
                 )}
-
-                {/* Auteur */}
-                <div style={{ fontSize: 10, color: '#C0C8D0', marginTop: 10 }}>
-                  Saisi par {entry.auteur}
-                </div>
               </article>
             ))}
           </div>

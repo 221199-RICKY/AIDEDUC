@@ -1,6 +1,44 @@
-import { useState, useEffect } from 'react'
+import { useState,useRef, useEffect } from 'react'
 import { AirtableService, calculerRapportsFinanciers } from './services/airtable'
 import type { EleveRaw, PaiementRaw } from './services/airtable'
+// Charger les données en temps réel depuis Supabase au démarrage
+useEffect(() => {
+  async function chargerDonnees() {
+    try {
+      setLoading(true)
+      
+      // 1. Récupérer les élèves
+      const { data: listEleves, error: err1 } = await supabase
+        .from('eleves')
+        .select('*')
+        .order('nom_prenom', { ascending: true })
+        
+      // 2. Récupérer les paiements
+      const { data: listPaiements, error: err2 } = await supabase
+        .from('paiements')
+        .select('*')
+
+      // 3. Récupérer les absences
+      const { data: listAbsences, error: err3 } = await supabase
+        .from('absences')
+        .select('*')
+
+      if (err1 || err2 || err3) throw new Error("Erreur de récupération Supabase")
+
+      // Mettre à jour nos états React avec les vraies données de Supabase
+      setEleves(listEleves || [])
+      setPaiements(listPaiements || [])
+      setAbsences(listAbsences || [])
+    } catch (error) {
+      console.error("Impossible de charger les données Supabase, conservation du fictif:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  chargerDonnees()
+}, []) // Les crochets vides signifient : "s'exécute une seule fois au chargement de la page"
+
 
 // Importations des vues Directeur
 import Dashboard from './components/Dashboard'
@@ -47,6 +85,11 @@ const MOCK_USER: User = {
 }
 
 export default function App() {
+  // À mettre au tout début de ton composant App
+ const [eleves, setEleves] = useState<any[]>([])
+ const [paiements, setPaiements] = useState<any[]>([])
+ const [absences, setAbsences] = useState<any[]>([])
+ const [loading, setLoading] = useState(true)
   const [vue, setVue] = useState<Vue>('directeur')
   const [profil, setProfil] = useState<Profil>('directeur')
 

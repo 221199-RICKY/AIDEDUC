@@ -5,10 +5,10 @@
 // ─────────────────────────────────────────────
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import type {
   User,
   Eleve,
-  Absence,
   Paiement,
   Notification,
   UserRole,
@@ -30,6 +30,15 @@ interface DashboardProps {
   onNavigate: (route: string) => void;
 }
 
+interface Notif {
+  id: string;
+  type: string;
+  titre: string;
+  corps: string;
+  createdAt: string;
+  lu: boolean;
+}
+
 // ─── Helpers ─────────────────────────────────
 
 const COLOR_MAP: Record<string, { bg: string; text: string; accent: string }> = {
@@ -41,9 +50,9 @@ const COLOR_MAP: Record<string, { bg: string; text: string; accent: string }> = 
 };
 
 function formatXOF(amount: number): string {
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000)     return `${(amount / 1_000).toFixed(0)}k`;
-  return amount.toLocaleString('fr-FR');
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M XOF`;
+  if (amount >= 1_000)     return `${(amount / 1_000).toFixed(0)}k XOF`;
+  return `${amount.toLocaleString('fr-FR')} XOF`;
 }
 
 function timeAgo(dateStr: string): string {
@@ -56,60 +65,14 @@ function timeAgo(dateStr: string): string {
   return `Il y a ${days} jour${days > 1 ? 's' : ''}`;
 }
 
-// ─── Données fictives (remplacées par API calls) ─
-
-const MOCK_KPIS_DIRECTEUR: KPI[] = [
-  { label: 'Élèves inscrits',       value: '1 248',  trend: '+34 vs an dernier', trendPositive: true,  color: 'blue',   icon: '👥' },
-  { label: 'Présence aujourd\'hui', value: '96,2 %', trend: '+1,1 % vs hier',   trendPositive: true,  color: 'green',  icon: '✅' },
-  { label: 'Encaissé ce mois',      value: '12,4M',  trend: '3,1M en attente',  trendPositive: false, color: 'amber',  icon: '💰' },
-  { label: 'Moyenne générale',      value: '13,4/20',trend: '+0,4 vs T2',       trendPositive: true,  color: 'purple', icon: '📊' },
-];
-
-const MOCK_KPIS_ENSEIGNANT: KPI[] = [
-  { label: 'Mes classes',          value: 3,       trend: '94 élèves au total',trendPositive: true,  color: 'blue',   icon: '🏫' },
-  { label: 'Notes à saisir',       value: 12,      trend: 'Clôture le 30 juin',trendPositive: false, color: 'amber',  icon: '📝' },
-  { label: 'Présence aujourd\'hui',value: '97 %',  trend: 'Terme. C — 1 absent',trendPositive: true,  color: 'green',  icon: '✅' },
-  { label: 'Messages non lus',     value: 3,       trend: 'Dont 1 urgent',     trendPositive: false, color: 'red',    icon: '💬' },
-];
-
-const MOCK_ABSENCES_RECENTES: Array<{
-  id: string; eleveNom: string; classe: string; date: string; matiere: string; joursRetard: number;
-}> = [
-  { id: '1', eleveNom: 'Amina Konaté',   classe: 'Terminale C', date: '2026-06-24', matiere: 'Maths',       joursRetard: 3 },
-  { id: '2', eleveNom: 'Mohamed Bello',  classe: '3ème A',      date: '2026-06-23', matiere: 'Français',    joursRetard: 2 },
-  { id: '3', eleveNom: 'Salimata Fall',  classe: '2nde B',      date: '2026-06-23', matiere: 'Histoire',    joursRetard: 2 },
-  { id: '4', eleveNom: 'Komi Togbé',     classe: '1ère D',      date: '2026-06-25', matiere: 'Anglais',     joursRetard: 1 },
-];
-
-const MOCK_NOTIFICATIONS: Array<{
-  id: string; type: string; titre: string; corps: string; createdAt: string; lu: boolean;
-}> = [
-  { id: '1', type: 'absence',      titre: 'Absence signalée',       corps: 'Ibrahim Konaté — Maths, 24 juin',         createdAt: new Date(Date.now() - 7_200_000).toISOString(),  lu: false },
-  { id: '2', type: 'paiement',     titre: 'Paiement reçu',          corps: 'Famille Adjovi — 45 000 XOF via Orange',  createdAt: new Date(Date.now() - 14_400_000).toISOString(), lu: false },
-  { id: '3', type: 'message',      titre: 'Message de Mme Konaté',  corps: 'Ibrahim pourra-t-il rattraper le cours ?', createdAt: new Date(Date.now() - 86_400_000).toISOString(), lu: true  },
-  { id: '4', type: 'note',         titre: 'Notes clôturées',        corps: 'Terminale C — Physique-Chimie',            createdAt: new Date(Date.now() - 172_800_000).toISOString(),lu: true  },
-];
-
+// ─── ACCÈS RAPIDES (UNIQUEMENT POUR LE DIRECTEUR) ───
 const QUICK_ACTIONS: Record<UserRole, Array<{ label: string; route: string; icon: string; color: string }>> = {
   directeur: [
-    { label: 'Saisir les notes',     route: '/notes',      icon: '📝', color: '#185FA5' },
-    { label: 'Gérer les absences',   route: '/absences',   icon: '📅', color: '#1D9E75' },
-    { label: 'Suivi paiements',      route: '/scolarite',  icon: '💳', color: '#BA7517' },
-    { label: 'Envoyer un message',   route: '/messagerie', icon: '💬', color: '#534AB7' },
-    { label: 'Générer les bulletins',route: '/bulletins',  icon: '📋', color: '#E24B4A' },
-    { label: 'Emploi du temps',      route: '/edt',        icon: '🗓️', color: '#0B6B5F' },
+    { label: 'Gérer les absences', route: '/absences',  icon: '📅', color: '#1D9E75' },
+    { label: 'Suivi paiements',    route: '/scolarite', icon: '💳', color: '#BA7517' },
   ],
-  enseignant: [
-    { label: 'Saisir les notes',     route: '/notes',      icon: '📝', color: '#185FA5' },
-    { label: 'Faire l\'appel',       route: '/absences',   icon: '📅', color: '#1D9E75' },
-    { label: 'Mes messages',         route: '/messagerie', icon: '💬', color: '#534AB7' },
-    { label: 'Mon emploi du temps',  route: '/edt',        icon: '🗓️', color: '#0B6B5F' },
-  ],
-  comptable: [
-    { label: 'Tableau paiements',    route: '/scolarite',  icon: '💳', color: '#BA7517' },
-    { label: 'Envoyer relances',     route: '/relances',   icon: '📨', color: '#E24B4A' },
-    { label: 'Export Excel',         route: '/exports',    icon: '📊', color: '#185FA5' },
-  ],
+  enseignant:  [],
+  comptable:   [],
   parent:      [],
   eleve:       [],
   super_admin: [],
@@ -151,56 +114,8 @@ function KPICard({ kpi }: KPICardProps) {
   );
 }
 
-interface AbsenceRowProps {
-  item: typeof MOCK_ABSENCES_RECENTES[0];
-  onNotify: (id: string) => void;
-}
-function AbsenceRow({ item, onNotify }: AbsenceRowProps) {
-  const urgent = item.joursRetard >= 3;
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      padding: '8px 0',
-      borderBottom: '0.5px solid #F0F0F0',
-    }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: '50%',
-        background: urgent ? '#FCEBEB' : '#FAEEDA',
-        color: urgent ? '#A32D2D' : '#633806',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 600, flexShrink: 0,
-      }}>
-        {item.eleveNom.split(' ').map(n => n[0]).join('').slice(0, 2)}
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{item.eleveNom}</div>
-        <div style={{ fontSize: 11, color: '#6C757D' }}>{item.classe} — {item.matiere}</div>
-      </div>
-      <span style={{
-        fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500,
-        background: urgent ? '#FCEBEB' : '#FAEEDA',
-        color: urgent ? '#A32D2D' : '#633806',
-      }}>
-        {item.joursRetard}j
-      </span>
-      <button
-        onClick={() => onNotify(item.id)}
-        style={{
-          fontSize: 10, padding: '4px 8px', borderRadius: 6,
-          border: '0.5px solid #DEE2E6', background: '#fff',
-          color: '#185FA5', cursor: 'pointer',
-        }}
-      >
-        SMS
-      </button>
-    </div>
-  );
-}
-
 interface NotifItemProps {
-  notif: typeof MOCK_NOTIFICATIONS[0];
+  notif: Notif;
   onRead: (id: string) => void;
 }
 function NotifItem({ notif, onRead }: NotifItemProps) {
@@ -236,9 +151,11 @@ function NotifItem({ notif, onRead }: NotifItemProps) {
 // ─── COMPOSANT PRINCIPAL ─────────────────────
 
 export default function Dashboard({ user, onNavigate }: DashboardProps) {
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
-  const [notifiedAbsences, setNotifiedAbsences] = useState<Set<string>>(new Set());
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [kpis, setKpis] = useState<KPI[]>([]);
+  const [notifications, setNotifications] = useState<Notif[]>([]);
+  const [nomEcole, setNomEcole] = useState<string>('AIDEDUC');
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Suivi de la connectivité réseau
   useEffect(() => {
@@ -252,17 +169,105 @@ export default function Dashboard({ user, onNavigate }: DashboardProps) {
     };
   }, []);
 
-  const kpis = user.role === 'enseignant'
-    ? MOCK_KPIS_ENSEIGNANT
-    : MOCK_KPIS_DIRECTEUR;
+  // Chargement des données Supabase
+  useEffect(() => {
+    async function chargerDonnees() {
+      try {
+        setLoading(true);
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        const [
+          { data: schoolData },
+          { data: studentsData },
+          { data: classesData },
+          { data: paiementsData },
+          { data: absencesTodayData },
+          { data: notifsData },
+        ] = await Promise.all([
+          supabase.from('schools').select('*'),
+          supabase.from('students').select('*'),
+          supabase.from('classes').select('*'),
+          supabase.from('paiements').select('*'),
+          supabase.from('absences').select('*').eq('date', todayStr),
+          supabase.from('notifications').select('*').limit(10),
+        ]);
+
+        // Nom de l'école
+        if (schoolData && schoolData.length > 0) {
+          const s = schoolData[0];
+          setNomEcole(s.nom ?? s.name ?? s.nom_ecole ?? 'AIDEDUC');
+        }
+
+        const totalEleves = studentsData?.length ?? 0;
+
+        // CALCUL DU TAUX DE PRÉSENCE RÉEL DU JOUR
+        const totalAbsentsAujourdhui = absencesTodayData?.length ?? 0;
+        let tauxPresenceStr = '100 %';
+        let trendPresence = 'Aucun absent aujourd\'hui';
+        let isTrendPositive = true;
+
+        if (totalEleves > 0) {
+          const elevesPresents = Math.max(0, totalEleves - totalAbsentsAujourdhui);
+          const pct = ((elevesPresents / totalEleves) * 100).toFixed(1);
+          tauxPresenceStr = `${pct} %`;
+          
+          if (totalAbsentsAujourdhui > 0) {
+            trendPresence = `${totalAbsentsAujourdhui} absent${totalAbsentsAujourdhui > 1 ? 's' : ''} enregistré${totalAbsentsAujourdhui > 1 ? 's' : ''}`;
+            isTrendPositive = false;
+          }
+        }
+
+        // Calcul total encaissé
+        const totalEncaisse = (paiementsData ?? []).reduce(
+          (sum, p) => sum + Number(p.montant ?? 0), 0
+        );
+
+        // Construction des KPIs réels
+        if (user.role === 'enseignant') {
+          const mesClassesCount = classesData?.length ?? 0;
+          setKpis([
+            { label: 'Mes classes',          value: mesClassesCount, trend: `${totalEleves} élèves au total`, trendPositive: true, color: 'blue',   icon: '🏫' },
+            { label: 'Notes à saisir',       value: 0,               trend: 'Toutes à jour',                 trendPositive: true, color: 'amber',  icon: '📝' },
+            { label: 'Présence aujourd\'hui',value: tauxPresenceStr, trend: trendPresence,                    trendPositive: isTrendPositive, color: 'green',  icon: '✅' },
+            { label: 'Messages non lus',     value: 0,               trend: 'À jour',                         trendPositive: true, color: 'red',    icon: '💬' },
+          ]);
+        } else {
+          setKpis([
+            { label: 'Élèves inscrits',       value: totalEleves.toLocaleString('fr-FR'), trend: 'Inscrits en BDD', trendPositive: true, color: 'blue',   icon: '👥' },
+            { label: 'Présence aujourd\'hui', value: tauxPresenceStr,                   trend: trendPresence,     trendPositive: isTrendPositive, color: 'green',  icon: '✅' },
+            { label: 'Encaissé total',        value: formatXOF(totalEncaisse),            trend: 'Base Supabase',   trendPositive: true, color: 'amber',  icon: '💰' },
+            { label: 'Classes actives',       value: classesData?.length ?? 0,           trend: 'Enregistrées',    trendPositive: true, color: 'purple', icon: '📊' },
+          ]);
+        }
+
+        // Mappage des notifications
+        if (notifsData && notifsData.length > 0) {
+          const mappedNotifs: Notif[] = notifsData.map((n, idx) => ({
+            id: String(n.id ?? idx),
+            type: n.type ?? 'message',
+            titre: n.titre ?? 'Notification',
+            corps: n.corps ?? n.message ?? '',
+            createdAt: n.created_at ?? n.createdAt ?? new Date().toISOString(),
+            lu: Boolean(n.lu),
+          }));
+          setNotifications(mappedNotifs);
+        } else {
+          setNotifications([]);
+        }
+
+      } catch (err) {
+        console.error('Erreur chargement Dashboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    chargerDonnees();
+  }, [user.role]);
 
   const quickActions = QUICK_ACTIONS[user.role] ?? [];
-
   const nonLus = notifications.filter(n => !n.lu).length;
-
-  function handleNotify(id: string) {
-    setNotifiedAbsences(prev => new Set(prev).add(id));
-  }
 
   function handleReadNotif(id: string) {
     setNotifications(prev =>
@@ -283,7 +288,7 @@ export default function Dashboard({ user, onNavigate }: DashboardProps) {
         <div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>AIDEDUC</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 }}>
-            Lycée Béhanzin • Cotonou
+            {nomEcole}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -345,7 +350,7 @@ export default function Dashboard({ user, onNavigate }: DashboardProps) {
           <p style={{ fontSize: 13, color: '#6C757D', marginTop: 3 }}>
             {new Date().toLocaleDateString('fr-FR', {
               weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-            })} — Trimestre 3
+            })}
           </p>
         </div>
 
@@ -399,71 +404,39 @@ export default function Dashboard({ user, onNavigate }: DashboardProps) {
           </section>
         )}
 
-        {/* ── GRILLE INFOS ── */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: 16,
+        {/* ── ACTIVITÉ RÉCENTE ── */}
+        <section aria-label="Notifications récentes" style={{
+          background: '#fff', border: '0.5px solid #DEE2E6',
+          borderRadius: 12, padding: 16,
         }}>
-
-          {/* Absences non justifiées */}
-          <section aria-label="Absences non justifiées" style={{
-            background: '#fff', border: '0.5px solid #DEE2E6',
-            borderRadius: 12, padding: 16,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h2 style={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
-                📅 Absences non justifiées
-              </h2>
-              <button
-                onClick={() => onNavigate('/absences')}
-                style={{ fontSize: 12, color: '#185FA5', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                Voir tout →
-              </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h2 style={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+              🔔 Activité récente
+              {nonLus > 0 && (
+                <span style={{
+                  fontSize: 10, padding: '1px 7px', borderRadius: 20,
+                  background: '#E6F1FB', color: '#0C447C', fontWeight: 600,
+                }}>{nonLus}</span>
+              )}
+            </h2>
+            <button
+              onClick={() => onNavigate('/notifications')}
+              style={{ fontSize: 12, color: '#185FA5', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              Tout marquer lu
+            </button>
+          </div>
+          {notifications.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#6C757D', padding: '12px 0', textAlign: 'center' }}>
+              Aucune notification récente
             </div>
-            {MOCK_ABSENCES_RECENTES.map(item => (
-              <AbsenceRow
-                key={item.id}
-                item={item}
-                onNotify={handleNotify}
-              />
-            ))}
-            {notifiedAbsences.size > 0 && (
-              <p style={{ fontSize: 11, color: '#1D9E75', marginTop: 8, textAlign: 'center' }}>
-                ✓ {notifiedAbsences.size} SMS envoyé{notifiedAbsences.size > 1 ? 's' : ''}
-              </p>
-            )}
-          </section>
-
-          {/* Notifications récentes */}
-          <section aria-label="Notifications récentes" style={{
-            background: '#fff', border: '0.5px solid #DEE2E6',
-            borderRadius: 12, padding: 16,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h2 style={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
-                🔔 Activité récente
-                {nonLus > 0 && (
-                  <span style={{
-                    fontSize: 10, padding: '1px 7px', borderRadius: 20,
-                    background: '#E6F1FB', color: '#0C447C', fontWeight: 600,
-                  }}>{nonLus}</span>
-                )}
-              </h2>
-              <button
-                onClick={() => onNavigate('/notifications')}
-                style={{ fontSize: 12, color: '#185FA5', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                Tout marquer lu
-              </button>
-            </div>
-            {notifications.map(n => (
+          ) : (
+            notifications.map(n => (
               <NotifItem key={n.id} notif={n} onRead={handleReadNotif} />
-            ))}
-          </section>
+            ))
+          )}
+        </section>
 
-        </div>
       </main>
     </div>
   );

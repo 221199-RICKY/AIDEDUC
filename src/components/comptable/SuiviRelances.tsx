@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────
 // AIDEDUC — SuiviRelances.tsx
 // src/components/comptable/SuiviRelances.tsx
-// Liste des impayés + relance WhatsApp click-to-chat
 // ─────────────────────────────────────────────
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { supabase } from '../../utils/supabaseClient'
 
 const C = {
   primary:   '#1B3A5C',
@@ -31,21 +31,13 @@ interface Impaye {
   numero: string
   parentNom: string
   parentTel: string
+  nomEcole: string
   totalDu: number
   totalPaye: number
   joursRetard: number
   derniereRelance?: string
   relanceCount: number
 }
-
-const INIT_IMPAYES: Impaye[] = [
-  { id:'i1', elevePrenom:'David',    eleveNom:'Sow',      classe:'Terminale C', numero:'TCL-004', parentNom:'M. Ibrahima Sow',      parentTel:'+22996000004', totalDu:225000, totalPaye:0,      joursRetard:45, relanceCount:2, derniereRelance:'2026-06-10' },
-  { id:'i2', elevePrenom:'Basile',   eleveNom:'Mensah',   classe:'Terminale C', numero:'TCL-002', parentNom:'Mme Adjoua Mensah',     parentTel:'+22997000002', totalDu:225000, totalPaye:100000, joursRetard:28, relanceCount:1, derniereRelance:'2026-06-18' },
-  { id:'i3', elevePrenom:'Nathan',   eleveNom:'Toviho',   classe:'2nde B',      numero:'2B-001',  parentNom:'M. Kossi Toviho',       parentTel:'+22898000007', totalDu:175000, totalPaye:25000,  joursRetard:34, relanceCount:1, derniereRelance:'2026-06-12' },
-  { id:'i4', elevePrenom:'Karine',   eleveNom:'Dossou',   classe:'Première D',  numero:'PD-003',  parentNom:'Mme Céleste Dossou',    parentTel:'+22994000003', totalDu:200000, totalPaye:75000,  joursRetard:20, relanceCount:0 },
-  { id:'i5', elevePrenom:'Lionel',   eleveNom:'Akplogan', classe:'Première D',  numero:'PD-004',  parentNom:'M. Théodore Akplogan',  parentTel:'+22995000012', totalDu:200000, totalPaye:25000,  joursRetard:15, relanceCount:0 },
-  { id:'i6', elevePrenom:'Quintina', eleveNom:'Houinsou', classe:'2nde B',      numero:'2B-004',  parentNom:'Mme Rosine Houinsou',   parentTel:'+22991000017', totalDu:175000, totalPaye:50000,  joursRetard:8,  relanceCount:0 },
-]
 
 function formatXOF(n: number): string { return n.toLocaleString('fr-FR') + ' XOF' }
 
@@ -59,9 +51,12 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day:'numeric', month:'short' })
 }
 
+// ── Message dynamique avec nom de l'école ──
 function buildMsg(i: Impaye): string {
   const reste = i.totalDu - i.totalPaye
-  return `Bonjour ${i.parentNom},\n\nNous vous contactons de la part du Lycée Béhanzin concernant les frais de scolarité de ${i.elevePrenom} ${i.eleveNom} (${i.classe}).\n\n📋 Situation :\n• Total dû : ${formatXOF(i.totalDu)}\n• Versé : ${formatXOF(i.totalPaye)}\n• Reste : ${formatXOF(reste)}\n• Retard : ${i.joursRetard} jour(s)\n\nMerci de régulariser au plus tôt.\nNous acceptons : Espèces, Orange Money, Wave, MTN Money.\n\n— Service comptable AIDEDUC`
+  const ecole = i.nomEcole && i.nomEcole.trim() !== '' ? i.nomEcole : 'notre établissement'
+
+  return `Bonjour ${i.parentNom},\n\nNous vous contactons de la part de ${ecole} concernant les frais de scolarité de ${i.elevePrenom} ${i.eleveNom} (${i.classe}).\n\n📋 Situation :\n• Total dû : ${formatXOF(i.totalDu)}\n• Versé : ${formatXOF(i.totalPaye)}\n• Reste : ${formatXOF(reste)}\n• Retard : ${i.joursRetard} jour(s)\n\nMerci de régulariser au plus tôt.\nNous acceptons : Espèces, Orange Money, Wave, MTN Money.\n\n— Service comptable ${ecole}`
 }
 
 function waUrl(i: Impaye): string {
@@ -77,11 +72,109 @@ const URGENCE_CFG: Record<NiveauUrgence, { label:string; bg:string; color:string
 interface SuiviRelancesProps { onBack: () => void }
 
 export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
-  const [impayes,   setImpayes]   = useState<Impaye[]>(INIT_IMPAYES)
+  const [impayes,   setImpayes]   = useState<Impaye[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [erreur,    setErreur]    = useState<string | null>(null)
   const [filtre,    setFiltre]    = useState<FiltreStatut>('tous')
   const [recherche, setRecherche] = useState('')
   const [relancees, setRelancees] = useState<Set<string>>(new Set())
   const [expanded,  setExpanded]  = useState<string | null>(null)
+
+  useEffect(() => {
+    async function chargerImpayes() {
+      try {
+        setLoading(true)
+
+        // Récupération simultanée avec extraction d'erreur pour school
+        const [
+          { data: schoolData, error: errSchool },
+          { data: classesData, error: errC },
+          { data: studentsData, error: errE },
+          { data: scolariteData, error: errS },
+          { data: paiementsData, error: errP },
+        ] = await Promise.all([
+          supabase.from('schools').select('*'), // On sélectionne tout pour éviter tout problème de colonne
+          supabase.from('classes').select('id, nom'),
+          supabase.from('students').select('*'),
+          supabase.from('scolarite').select('*'),
+          supabase.from('paiements').select('*'),
+        ])
+
+        if (errSchool) console.error('Erreur table school:', errSchool)
+        if (errC) throw errC
+        if (errE) throw errE
+        if (errS) throw errS
+        if (errP) throw errP
+
+        // Debug dans la console F12 pour vérifier le contenu de la table school
+        console.log('Données enregistrées dans school :', schoolData)
+
+        // Dictionnaire des écoles (si plusieurs enregistrements)
+        const schoolMap = new Map<string, string>()
+        schoolData?.forEach(s => {
+          const nom = s.nom ?? s.name ?? s.nom_ecole ?? ''
+          if (s.id) schoolMap.set(String(s.id), nom)
+        })
+
+        // Nom par défaut (premier élément de la table school)
+        const nomEcoleGlobal = schoolData && schoolData.length > 0
+          ? (schoolData[0].nom ?? schoolData[0].name ?? schoolData[0].nom_ecole ?? '')
+          : ''
+
+        const classesMap = new Map<string, string>()
+        classesData?.forEach(c => classesMap.set(String(c.id), c.nom))
+
+        const scolariteMap = new Map<string, number>()
+        scolariteData?.forEach(s => scolariteMap.set(String(s.classeid), Number(s.scolarite ?? 0)))
+
+        const listeImpayes: Impaye[] = []
+
+        studentsData?.forEach(eleve => {
+          const classIdStr = eleve.class_id ? String(eleve.class_id) : ''
+          const classeNom = classesMap.get(classIdStr) ?? 'Non assignée'
+          const totalDu = scolariteMap.get(classIdStr) ?? 0
+
+          const totalPaye = (paiementsData ?? [])
+            .filter(p => String(p.eleveid) === String(eleve.id))
+            .reduce((sum, p) => sum + Number(p.montant ?? 0), 0)
+
+          const reste = totalDu - totalPaye
+
+          // Détermination du nom de l'école (par élève s'il y a un school_id, sinon le nom global)
+          const eleveSchoolId = eleve.school_id ? String(eleve.school_id) : null
+          const nomEcoleEleve = (eleveSchoolId && schoolMap.has(eleveSchoolId))
+            ? schoolMap.get(eleveSchoolId)!
+            : nomEcoleGlobal
+
+          if (reste > 0) {
+            listeImpayes.push({
+              id: String(eleve.id),
+              elevePrenom: eleve.prenom ?? eleve.Prenom ?? '',
+              eleveNom: eleve.nom ?? eleve.Nom ?? '',
+              classe: classeNom,
+              parentNom: eleve.parent_nom ?? eleve.parentNom ?? 'M./Mme Parent',
+              parentTel: eleve.parent_tel ?? eleve.parentTel ?? eleve.telephone ?? '',
+              nomEcole: nomEcoleEleve,
+              totalDu,
+              totalPaye,
+              joursRetard: Number(eleve.jours_retard ?? eleve.joursRetard ?? 15),
+              derniereRelance: eleve.derniere_relance ?? eleve.derniereRelance ?? undefined,
+              relanceCount: Number(eleve.relance_count ?? eleve.relanceCount ?? 0),
+            })
+          }
+        })
+
+        setImpayes(listeImpayes)
+      } catch (err: unknown) {
+        console.error('Erreur chargement impayés:', err)
+        setErreur('Impossible de charger les données des relances.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    chargerImpayes()
+  }, [])
 
   const stats = useMemo(() => ({
     totalReste: impayes.reduce((s,i) => s + i.totalDu - i.totalPaye, 0),
@@ -119,6 +212,15 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
     })
   }
 
+  if (loading) return (
+    <div style={{ display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', background:C.bg, fontFamily:"'Inter',system-ui,sans-serif" }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontSize:40, marginBottom:12 }}>📲</div>
+        <div style={{ fontSize:14, color:C.textMuted, fontWeight:600 }}>Chargement des relances…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", background:C.bg, minHeight:'100vh', maxWidth:480, margin:'0 auto', display:'flex', flexDirection:'column' }}>
 
@@ -142,6 +244,12 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
           <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color:'rgba(255,255,255,0.5)', pointerEvents:'none' }}>🔍</span>
         </div>
       </header>
+
+      {erreur && (
+        <div style={{ margin:'14px 16px 0', background:'#FCEBEB', border:'1px solid #F7A3A3', borderRadius:10, padding:'11px 14px', fontSize:13, color:'#A32D2D' }}>
+          ⚠️ {erreur}
+        </div>
+      )}
 
       <main style={{ flex:1, padding:'14px 16px 28px', display:'flex', flexDirection:'column', gap:12 }}>
 
@@ -202,7 +310,7 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
               return (
                 <div key={i.id} style={{ background:C.surface, border:`1px solid ${dejaRel?'#97C459':cfg.border}`, borderLeft:`4px solid ${dejaRel?C.green:cfg.color}`, borderRadius:12, overflow:'hidden', transition:'border-color 0.2s' }}>
 
-                  {/* Ligne principale — cliquable */}
+                  {/* Ligne principale */}
                   <div onClick={() => setExpanded(isOpen ? null : i.id)} style={{ padding:'12px 14px', cursor:'pointer', display:'flex', alignItems:'center', gap:10 }}>
                     <div style={{ width:38, height:38, borderRadius:'50%', background:dejaRel?'#EAF3DE':cfg.bg, color:dejaRel?'#27500A':cfg.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, flexShrink:0 }}>
                       {i.elevePrenom[0]}{i.eleveNom[0]}
@@ -241,6 +349,7 @@ export default function SuiviRelances({ onBack }: SuiviRelancesProps) {
                         {[
                           { label:'Parent / Tuteur',   value: i.parentNom },
                           { label:'Téléphone',          value: i.parentTel },
+                          { label:'Établissement',      value: i.nomEcole || 'Non renseigné' },
                           { label:'Nb de relances',     value: `${i.relanceCount} envoyée${i.relanceCount>1?'s':''}` },
                           ...(i.derniereRelance ? [{ label:'Dernière relance', value: formatDate(i.derniereRelance) }] : []),
                         ].map(r => (

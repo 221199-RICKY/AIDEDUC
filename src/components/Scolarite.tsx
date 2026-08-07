@@ -1,23 +1,21 @@
 // ─────────────────────────────────────────────
 // EduConnect West Africa — Scolarite.tsx
 // src/components/Scolarite.tsx
-// Gestion des frais de scolarité et relances
+// Liaison : Students (class_id, parentTel) ➔ Classes (nom) ➔ Scolarite (scolarite) ➔ Paiements
+// Canal de Relance : WhatsApp (déclenché via parentTel)
 // ─────────────────────────────────────────────
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import type {
   Creance,
   Paiement,
   StatutPaiement,
   ProviderMobileMoney,
   Eleve,
-  FraisScolarite,
 } from '../types';
 
-// ─── Types locaux ─────────────────────────────
-
 type FiltreStatut = 'tous' | StatutPaiement;
-type FiltreClasse = 'toutes' | string;
 
 interface ScolariteProps {
   ecoleId: string;
@@ -25,43 +23,7 @@ interface ScolariteProps {
   isOnline: boolean;
 }
 
-// ─── Mock data ────────────────────────────────
-
-const MOCK_FRAIS: FraisScolarite[] = [
-  { id: 'f1', ecoleId: 'ec-1', anneeScolaire: '2025-2026', typeFrais: 'scolarite_t3', montant: 75_000, devise: 'XOF', description: 'Scolarité Trimestre 3' },
-  { id: 'f2', ecoleId: 'ec-1', anneeScolaire: '2025-2026', typeFrais: 'inscription',  montant: 25_000, devise: 'XOF', description: 'Frais d\'inscription' },
-];
-
-const MOCK_CREANCES: Creance[] = [
-  {
-    eleveId: 'e1', totalDu: 75_000, totalPaye: 75_000, solde: 0, joursRetard: 0,
-    eleve: { id: 'e1', nom: 'Adjovi',    prenom: 'Chloé',    dateNaissance: '', lieuNaissance: '', classeId: 'cl-1', ecoleId: 'ec-1', numeroEleve: 'TCL-003', parentIds: [], redoublant: false, createdAt: '' },
-    paiements: [{ id: 'p1', eleveId: 'e1', fraisId: 'f1', frais: MOCK_FRAIS[0], montantPaye: 75_000, montantDu: 75_000, statut: 'paye',      provider: 'orange_money', reference: 'EC-2026-001', dateEcheance: '2026-06-30', datePaiement: '2026-06-10', notifEnvoyee: true, createdAt: '2026-06-10' }],
-  },
-  {
-    eleveId: 'e2', totalDu: 75_000, totalPaye: 37_500, solde: -37_500, joursRetard: 8,
-    eleve: { id: 'e2', nom: 'Mensah',    prenom: 'Basile',   dateNaissance: '', lieuNaissance: '', classeId: 'cl-1', ecoleId: 'ec-1', numeroEleve: 'TCL-002', parentIds: [], redoublant: false, createdAt: '' },
-    paiements: [{ id: 'p2', eleveId: 'e2', fraisId: 'f1', frais: MOCK_FRAIS[0], montantPaye: 37_500, montantDu: 75_000, statut: 'partiel',    provider: 'wave',         reference: 'EC-2026-002', dateEcheance: '2026-06-30', notifEnvoyee: false, createdAt: '2026-06-01' }],
-  },
-  {
-    eleveId: 'e3', totalDu: 75_000, totalPaye: 0, solde: -75_000, joursRetard: 21,
-    eleve: { id: 'e3', nom: 'Dossou-M.', prenom: 'Daniel',   dateNaissance: '', lieuNaissance: '', classeId: 'cl-2', ecoleId: 'ec-1', numeroEleve: 'TCL-010', parentIds: [], redoublant: false, createdAt: '' },
-    paiements: [{ id: 'p3', eleveId: 'e3', fraisId: 'f1', frais: MOCK_FRAIS[0], montantPaye: 0,      montantDu: 75_000, statut: 'en_attente', provider: 'especes',      reference: 'EC-2026-003', dateEcheance: '2026-06-30', notifEnvoyee: false, createdAt: '2026-06-01' }],
-  },
-  {
-    eleveId: 'e4', totalDu: 75_000, totalPaye: 0, solde: -75_000, joursRetard: 34,
-    eleve: { id: 'e4', nom: 'Sénou A.',  prenom: 'Serge',    dateNaissance: '', lieuNaissance: '', classeId: 'cl-2', ecoleId: 'ec-1', numeroEleve: 'TCL-011', parentIds: [], redoublant: true,  createdAt: '' },
-    paiements: [{ id: 'p4', eleveId: 'e4', fraisId: 'f1', frais: MOCK_FRAIS[0], montantPaye: 0,      montantDu: 75_000, statut: 'retard',     provider: 'especes',      reference: 'EC-2026-004', dateEcheance: '2026-05-31', notifEnvoyee: true,  createdAt: '2026-05-01' }],
-  },
-  {
-    eleveId: 'e5', totalDu: 75_000, totalPaye: 75_000, solde: 0, joursRetard: 0,
-    eleve: { id: 'e5', nom: 'Konaté',    prenom: 'Ibrahim',  dateNaissance: '', lieuNaissance: '', classeId: 'cl-1', ecoleId: 'ec-1', numeroEleve: 'TCL-001', parentIds: [], redoublant: false, createdAt: '' },
-    paiements: [{ id: 'p5', eleveId: 'e5', fraisId: 'f1', frais: MOCK_FRAIS[0], montantPaye: 75_000, montantDu: 75_000, statut: 'paye',      provider: 'mtn_money',    reference: 'EC-2026-005', dateEcheance: '2026-06-30', datePaiement: '2026-06-28', notifEnvoyee: true, createdAt: '2026-06-28' }],
-  },
-];
-
-// ─── Helpers ─────────────────────────────────
-
+// Formatage devises
 function formatXOF(n: number): string {
   return n.toLocaleString('fr-FR') + ' XOF';
 }
@@ -73,7 +35,7 @@ const STATUT_CONFIG: Record<StatutPaiement, { label: string; bg: string; text: s
   retard:     { label: '⚠ Retard',     bg: '#FCEBEB', text: '#A32D2D' },
 };
 
-const PROVIDER_LABELS: Record<ProviderMobileMoney, string> = {
+const PROVIDER_LABELS: Record<string, string> = {
   orange_money:   '🟠 Orange Money',
   wave:           '🔵 Wave',
   mtn_money:      '🟡 MTN Money',
@@ -82,20 +44,23 @@ const PROVIDER_LABELS: Record<ProviderMobileMoney, string> = {
   especes:        '💵 Espèces',
 };
 
-// ─── Sous-composants ─────────────────────────
+// ─── Sous-composant Ligne Créance ─────────────
 
 interface CreanceRowProps {
-  creance: Creance;
-  onRelance: (eleveId: string) => void;
+  creance: Creance & { telephoneParent?: string };
+  nomClasse: string;
+  onRelance: (creance: Creance & { telephoneParent?: string }) => void;
   relanceEnCours: boolean;
   relanceEnvoyee: boolean;
 }
 
-function CreanceRow({ creance, onRelance, relanceEnCours, relanceEnvoyee }: CreanceRowProps) {
+function CreanceRow({ creance, nomClasse, onRelance, relanceEnCours, relanceEnvoyee }: CreanceRowProps) {
   const paiement  = creance.paiements[0];
-  const cfg       = STATUT_CONFIG[paiement.statut];
+  const cfg       = STATUT_CONFIG[paiement ? paiement.statut : 'en_attente'];
   const urgent    = creance.joursRetard >= 20;
-  const initiales = `${creance.eleve.prenom[0]}${creance.eleve.nom[0]}`.toUpperCase();
+  const prenomInit = creance.eleve.prenom ? creance.eleve.prenom[0] : '';
+  const nomInit = creance.eleve.nom ? creance.eleve.nom[0] : '';
+  const initiales = `${prenomInit}${nomInit}`.toUpperCase() || 'E';
 
   return (
     <div style={{
@@ -115,15 +80,22 @@ function CreanceRow({ creance, onRelance, relanceEnCours, relanceEnvoyee }: Crea
         {initiales}
       </div>
 
-      {/* Nom + classe */}
+      {/* Nom + Nom de la Classe */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E' }}>
           {creance.eleve.prenom} {creance.eleve.nom}
         </div>
-        <div style={{ fontSize: 11, color: '#6C757D' }}>
-          {creance.eleve.numeroEleve}
+        <div style={{ fontSize: 11, color: '#6C757D', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          {/* Badge Classe */}
+          <span style={{
+            background: '#E9ECEF', color: '#495057',
+            padding: '1px 6px', borderRadius: 4, fontWeight: 600, fontSize: 10
+          }}>
+            {nomClasse}
+          </span>
+
           {creance.joursRetard > 0 && (
-            <span style={{ color: urgent ? '#A32D2D' : '#BA7517', marginLeft: 6 }}>
+            <span style={{ color: urgent ? '#A32D2D' : '#BA7517' }}>
               • {creance.joursRetard}j de retard
             </span>
           )}
@@ -151,21 +123,24 @@ function CreanceRow({ creance, onRelance, relanceEnCours, relanceEnvoyee }: Crea
         {cfg.label}
       </span>
 
-      {/* Bouton relance */}
-      {paiement.statut !== 'paye' && (
+      {/* Bouton relance WhatsApp */}
+      {paiement && paiement.statut !== 'paye' && (
         <button
-          onClick={() => onRelance(creance.eleveId)}
-          disabled={relanceEnCours || relanceEnvoyee}
+          onClick={() => onRelance(creance)}
+          disabled={relanceEnCours}
           style={{
             fontSize: 11, padding: '5px 10px', borderRadius: 6, flexShrink: 0,
-            border: `0.5px solid ${relanceEnvoyee ? '#97C459' : '#DEE2E6'}`,
-            background: relanceEnvoyee ? '#EAF3DE' : '#fff',
-            color: relanceEnvoyee ? '#27500A' : '#185FA5',
-            cursor: relanceEnCours || relanceEnvoyee ? 'default' : 'pointer',
-            fontWeight: 500,
+            border: 'none',
+            background: relanceEnvoyee ? '#DCFCE7' : '#25D366',
+            color: relanceEnvoyee ? '#15803D' : '#ffffff',
+            cursor: relanceEnCours ? 'default' : 'pointer',
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
           }}
         >
-          {relanceEnvoyee ? '✓ SMS envoyé' : relanceEnCours ? '…' : '📨 SMS'}
+          {relanceEnvoyee ? '✓ Relancé' : relanceEnCours ? '…' : '💬 WhatsApp'}
         </button>
       )}
     </div>
@@ -181,46 +156,288 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
   const [relancesEnvoyees, setRelancesEnvoyees] = useState<Set<string>>(new Set());
   const [onglet, setOnglet] = useState<'creances' | 'transactions'>('creances');
 
-  // Statistiques globales
+  // Données dynamiques
+  const [creances, setCreances] = useState<(Creance & { telephoneParent?: string })[]>([]);
+  const [mapClasses, setMapClasses] = useState<Record<string, string>>({}); // Stocke ID classe -> Nom classe
+  const [nomEcole, setNomEcole] = useState<string>('');
+  const [anneeEncours, setAnneeEncours] = useState<string>('');
+  const [periodeEncours, setPeriodeEncours] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // ── CHARGEMENT ET DÉROULÉ SUPABASE ──
+  useEffect(() => {
+    async function chargerDonneesEtLiaisons() {
+      try {
+        setLoading(true);
+        setErrorMsg(null);
+
+        // 1. École (`schools`)
+        let schoolData = null;
+        if (ecoleId) {
+          const { data } = await supabase
+            .from('schools')
+            .select('nom, periode_courante, annee_scolaire_courante')
+            .eq('id', ecoleId)
+            .maybeSingle();
+          schoolData = data;
+
+          if (schoolData) {
+            setNomEcole(schoolData.nom || '');
+            setAnneeEncours(schoolData.annee_scolaire_courante || '');
+            setPeriodeEncours(schoolData.periode_courante || '');
+          }
+        }
+
+        // 2. Table `classes` (pour afficher les vrais noms de classes au lieu des IDs)
+        const { data: dbClasses } = await supabase
+          .from('classes')
+          .select('*');
+
+        const classesMapping: Record<string, string> = {};
+        (dbClasses || []).forEach((c: any) => {
+          classesMapping[String(c.id).trim()] = c.nom || c.name || c.libelle || `Classe ${c.id}`;
+        });
+        setMapClasses(classesMapping);
+
+        // 3. Élèves (`students`) - Récupération incluant la colonne parentTel
+        const { data: dbStudents, error: errStudents } = await supabase
+          .from('students')
+          .select('*');
+
+        if (errStudents) throw errStudents;
+
+        let elevesFiltres = (dbStudents || []).filter((s: any) => {
+          if (!ecoleId) return true;
+          return String(s.school_id).trim() === String(ecoleId).trim();
+        });
+
+        if (elevesFiltres.length === 0 && dbStudents && dbStudents.length > 0) {
+          elevesFiltres = dbStudents;
+        }
+
+        // 4. Tarifs de scolarité (`scolarite`)
+        const { data: dbScolarite, error: errScolarite } = await supabase
+          .from('scolarite')
+          .select('*');
+
+        if (errScolarite) throw errScolarite;
+
+        // 5. Paiements (`paiements`)
+        const { data: dbPaiements, error: errPaiements } = await supabase
+          .from('paiements')
+          .select('*');
+
+        if (errPaiements) throw errPaiements;
+
+        // 6. CONSTRUCTION DES CRÉANCES
+        const creancesConstruites = elevesFiltres.map((student: any) => {
+          const studentClassId = String(student.class_id || '').trim();
+
+          // Tarif lié à la classe de l'élève
+          const scolaritesClasse = (dbScolarite || []).filter(
+            (sc: any) => String(sc.classeid).trim() === studentClassId
+          );
+
+          const totalDu = scolaritesClasse.reduce(
+            (sum: number, item: any) => sum + (Number(item.scolarite) || 0),
+            0
+          );
+
+          // Versements de l'élève
+          const paiementsEleve = (dbPaiements || []).filter(
+            (p: any) => String(p.eleveid).trim() === String(student.id).trim()
+          );
+
+          const totalPaye = paiementsEleve.reduce(
+            (sum: number, p: any) => sum + (Number(p.montant) || 0),
+            0
+          );
+
+          const solde = totalPaye - totalDu;
+
+          let statutCalcul: StatutPaiement = 'en_attente';
+          if (totalPaye >= totalDu && totalDu > 0) {
+            statutCalcul = 'paye';
+          } else if (totalPaye > 0) {
+            statutCalcul = 'partiel';
+          }
+
+          const paiementsFormates: Paiement[] = paiementsEleve.map((p: any) => ({
+            id: String(p.id),
+            eleveId: String(student.id),
+            fraisId: '',
+            frais: {
+              id: '',
+              ecoleId: String(student.school_id || ecoleId),
+              anneeScolaire: schoolData?.annee_scolaire_courante || '',
+              typeFrais: p.typefrais || 'scolarite',
+              montant: totalDu,
+              devise: 'XOF',
+              description: 'Frais de Scolarité'
+            },
+            montantPaye: Number(p.montant) || 0,
+            montantDu: totalDu,
+            statut: statutCalcul,
+            provider: (p.provider as ProviderMobileMoney) || 'especes',
+            reference: p.reference || `REF-${p.id}`,
+            dateEcheance: '',
+            datePaiement: p.date || p.created_at,
+            notifEnvoyee: false,
+            createdAt: p.created_at || ''
+          }));
+
+          if (paiementsFormates.length === 0) {
+            paiementsFormates.push({
+              id: `p-init-${student.id}`,
+              eleveId: String(student.id),
+              fraisId: '',
+              frais: {
+                id: '',
+                ecoleId: String(student.school_id || ecoleId),
+                anneeScolaire: schoolData?.annee_scolaire_courante || '',
+                typeFrais: 'scolarite',
+                montant: totalDu,
+                devise: 'XOF',
+                description: 'Frais de Scolarité'
+              },
+              montantPaye: 0,
+              montantDu: totalDu,
+              statut: statutCalcul,
+              provider: 'especes',
+              reference: `EC-${student.id}`,
+              dateEcheance: '',
+              notifEnvoyee: false,
+              createdAt: ''
+            });
+          }
+
+          const eleveFormate: Eleve = {
+            id: String(student.id),
+            nom: student.nom || '',
+            prenom: student.prenom || '',
+            dateNaissance: '',
+            lieuNaissance: '',
+            classeId: studentClassId,
+            ecoleId: String(student.school_id || ecoleId),
+            numeroEleve: student.matricule || `ELEVE-${student.id}`,
+            parentIds: [],
+            redoublant: false,
+            createdAt: ''
+          };
+
+          // Extraction directe depuis la colonne parentTel
+          const telephoneParentVal = student.parentTel || student.parenttel || '';
+
+          return {
+            eleveId: String(student.id),
+            totalDu,
+            totalPaye,
+            solde,
+            joursRetard: (statutCalcul !== 'paye' && totalPaye < totalDu) ? 15 : 0,
+            eleve: eleveFormate,
+            paiements: paiementsFormates,
+            telephoneParent: String(telephoneParentVal).trim()
+          };
+        });
+
+        setCreances(creancesConstruites);
+      } catch (err: any) {
+        console.error('Erreur Supabase :', err);
+        setErrorMsg(err.message || 'Erreur lors du chargement.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    chargerDonneesEtLiaisons();
+  }, [ecoleId]);
+
+  // Statistiques
   const stats = useMemo(() => {
-    const total    = MOCK_CREANCES.reduce((s, c) => s + c.totalDu,   0);
-    const encaisse = MOCK_CREANCES.reduce((s, c) => s + c.totalPaye, 0);
+    const total    = creances.reduce((s, c) => s + c.totalDu,   0);
+    const encaisse = creances.reduce((s, c) => s + c.totalPaye, 0);
     const reste    = total - encaisse;
     const taux     = total > 0 ? Math.round((encaisse / total) * 100) : 0;
-    const nbRetard = MOCK_CREANCES.filter(c => c.paiements[0].statut === 'retard').length;
+    const nbRetard = creances.filter(c => c.paiements[0]?.statut === 'retard').length;
     return { total, encaisse, reste, taux, nbRetard };
-  }, []);
+  }, [creances]);
 
   // Filtrage
   const creancesFiltrees = useMemo(() => {
-    return MOCK_CREANCES.filter(c => {
-      const nom = `${c.eleve.prenom} ${c.eleve.nom}`.toLowerCase();
-      const matchRecherche = recherche === '' || nom.includes(recherche.toLowerCase());
-      const matchStatut    = filtreStatut === 'tous' || c.paiements[0].statut === filtreStatut;
+    return creances.filter(c => {
+      const nomComplet = `${c.eleve.prenom} ${c.eleve.nom}`.toLowerCase();
+      const classeNom  = (mapClasses[c.eleve.classeId] || '').toLowerCase();
+      const matchRecherche = recherche === '' || 
+        nomComplet.includes(recherche.toLowerCase()) || 
+        classeNom.includes(recherche.toLowerCase());
+
+      const statutCourant  = c.paiements[0]?.statut || 'en_attente';
+      const matchStatut    = filtreStatut === 'tous' || statutCourant === filtreStatut;
       return matchRecherche && matchStatut;
     });
-  }, [filtreStatut, recherche]);
+  }, [creances, filtreStatut, recherche, mapClasses]);
 
-  // Relance SMS individuelle
-  const handleRelance = useCallback(async (eleveId: string) => {
-    setRelancesEnCours(prev => new Set(prev).add(eleveId));
-    await new Promise(r => setTimeout(r, 900));
-    setRelancesEnCours(prev => { const s = new Set(prev); s.delete(eleveId); return s; });
-    setRelancesEnvoyees(prev => new Set(prev).add(eleveId));
-  }, []);
+  // ── LOGIQUE DE RELANCE PAR WHATSAPP VIA PARENTTEL ──
+  const handleRelance = useCallback((creance: Creance & { telephoneParent?: string }) => {
+    const telephone = creance.telephoneParent;
+    const eleveNom = `${creance.eleve.prenom} ${creance.eleve.nom}`;
+    const resteAPayer = Math.abs(creance.solde);
 
-  // Relancer tous les retards
+    if (!telephone) {
+      alert(`Aucun numéro de téléphone parent (parentTel) n'est renseigné pour l'élève ${eleveNom}.`);
+      return;
+    }
+
+    setRelancesEnCours(prev => new Set(prev).add(creance.eleveId));
+
+    // Formatage international du numéro (Par défaut Bénin +229)
+    let phoneClean = telephone.replace(/[\s\-\(\)]/g, '');
+    if (!phoneClean.startsWith('+') && !phoneClean.startsWith('229')) {
+      phoneClean = `229${phoneClean}`;
+    } else if (phoneClean.startsWith('+')) {
+      phoneClean = phoneClean.substring(1);
+    }
+
+    // Message pré-rempli
+    const message = `Bonjour,\n\nNous vous contactons concernant la scolarité de l'élève *${eleveNom}* dans notre établissement ${nomEcole ? `(${nomEcole})` : ''}.\n\nLe montant restant à régler s'élève à *${formatXOF(resteAPayer)}*.\nMerci de bien vouloir régulariser ce paiement dès que possible.\n\nCordialement,\nLa Direction - AIDEDUC.`;
+
+    const url = `https://wa.me/${phoneClean}?text=${encodeURIComponent(message)}`;
+
+    // Ouverture du lien WhatsApp
+    window.open(url, '_blank');
+
+    setRelancesEnCours(prev => { const s = new Set(prev); s.delete(creance.eleveId); return s; });
+    setRelancesEnvoyees(prev => new Set(prev).add(creance.eleveId));
+  }, [nomEcole]);
+
   const handleRelancerTous = useCallback(async () => {
-    const ids = MOCK_CREANCES
-      .filter(c => ['retard', 'en_attente'].includes(c.paiements[0].statut))
-      .map(c => c.eleveId);
-    ids.forEach(id => setRelancesEnCours(prev => new Set(prev).add(id)));
-    await new Promise(r => setTimeout(r, 1400));
-    ids.forEach(id => {
-      setRelancesEnCours(prev => { const s = new Set(prev); s.delete(id); return s; });
-      setRelancesEnvoyees(prev => new Set(prev).add(id));
-    });
-  }, []);
+    const creancesArelancer = creances.filter(c => 
+      ['retard', 'en_attente', 'partiel'].includes(c.paiements[0]?.statut) && c.solde < 0
+    );
+
+    if (creancesArelancer.length === 0) {
+      alert("Aucune créance en retard ou non soldée à relancer.");
+      return;
+    }
+
+    if (window.confirm(`Vous allez ouvrir les relances WhatsApp (parentTel) pour ${creancesArelancer.length} élève(s). Voulez-vous continuer ?`)) {
+      for (const c of creancesArelancer) {
+        handleRelance(c);
+      }
+    }
+  }, [creances, handleRelance]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', backgroundColor: '#F5F7FA' }}>
+        <div style={{ textAlign: 'center', color: '#1B3A5C', fontWeight: '500' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⚡</div>
+          Chargement des classes et des frais...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: '#F5F7FA', minHeight: '100vh' }}>
@@ -246,8 +463,8 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
           </button>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 600 }}>Frais de scolarité</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 }}>
-              Trimestre 3 — Lycée Béhanzin • Année 2025–2026
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>
+              {periodeEncours || 'Suivi Financier'} {nomEcole ? `— ${nomEcole}` : ''} {anneeEncours ? `• ${anneeEncours}` : ''}
             </div>
           </div>
           {!isOnline && (
@@ -262,18 +479,24 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
             onClick={handleRelancerTous}
             style={{
               padding: '7px 14px', borderRadius: 8, border: 'none',
-              background: '#E24B4A', color: '#fff', fontWeight: 500,
-              fontSize: 12, cursor: 'pointer',
+              background: '#25D366', color: '#fff', fontWeight: 600,
+              fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
             }}
           >
-            📨 Relancer tout
+            💬 Relancer par WhatsApp
           </button>
         </div>
       </header>
 
       <main style={{ padding: '16px 20px', maxWidth: 900, margin: '0 auto' }}>
 
-        {/* ── KPIs ── */}
+        {errorMsg && (
+          <div style={{ backgroundColor: '#FCEBEB', color: '#A32D2D', padding: '12px 16px', borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+            ⚠️ {errorMsg}
+          </div>
+        )}
+
+        {/* ── KPIs DYNAMIQUES ── */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
@@ -296,7 +519,7 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
           ))}
         </div>
 
-        {/* Barre de progression globale */}
+        {/* Barre de progression */}
         <div style={{
           background: '#fff', border: '0.5px solid #DEE2E6',
           borderRadius: 10, padding: '12px 14px', marginBottom: 16,
@@ -339,11 +562,11 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
 
         {onglet === 'creances' && (
           <>
-            {/* Recherche + filtres */}
+            {/* Recherche par élève ou classe */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <input
                 type="search"
-                placeholder="Rechercher un élève…"
+                placeholder="Rechercher par élève ou classe…"
                 value={recherche}
                 onChange={e => setRecherche(e.target.value)}
                 style={{
@@ -376,13 +599,14 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
             }}>
               {creancesFiltrees.length === 0 ? (
                 <div style={{ padding: 32, textAlign: 'center', color: '#6C757D', fontSize: 13 }}>
-                  Aucun élève correspondant.
+                  Aucun élève trouvé.
                 </div>
               ) : (
                 creancesFiltrees.map(creance => (
                   <CreanceRow
                     key={creance.eleveId}
                     creance={creance}
+                    nomClasse={mapClasses[creance.eleve.classeId] || 'Classe N/A'}
                     onRelance={handleRelance}
                     relanceEnCours={relancesEnCours.has(creance.eleveId)}
                     relanceEnvoyee={relancesEnvoyees.has(creance.eleveId)}
@@ -393,11 +617,10 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
 
             {relancesEnvoyees.size > 0 && (
               <p style={{
-                fontSize: 12, color: '#1D9E75', textAlign: 'center', marginTop: 12,
-                background: '#EAF3DE', borderRadius: 8, padding: '8px 14px',
+                fontSize: 12, color: '#15803D', textAlign: 'center', marginTop: 12,
+                background: '#DCFCE7', borderRadius: 8, padding: '8px 14px',
               }}>
-                ✅ {relancesEnvoyees.size} SMS de relance envoyé{relancesEnvoyees.size > 1 ? 's' : ''}
-                {!isOnline && ' (en attente de connexion)'}
+                💬 {relancesEnvoyees.size} relance{relancesEnvoyees.size > 1 ? 's' : ''} WhatsApp initiée{relancesEnvoyees.size > 1 ? 's' : ''} avec succès.
               </p>
             )}
           </>
@@ -408,41 +631,50 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
             background: '#fff', border: '0.5px solid #DEE2E6',
             borderRadius: 12, overflow: 'hidden',
           }}>
-            {MOCK_CREANCES.filter(c => c.totalPaye > 0).map((creance, idx, arr) => {
-              const p = creance.paiements[0];
-              return (
-                <div key={creance.eleveId} style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 14px',
-                  borderBottom: idx < arr.length - 1 ? '0.5px solid #F0F0F0' : 'none',
-                }}>
-                  <span style={{ fontSize: 18 }}>
-                    {{ orange_money: '🟠', wave: '🔵', mtn_money: '🟡', moov_money: '🟢', carte_bancaire: '💳', especes: '💵' }[p.provider]}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>
-                      Famille {creance.eleve.nom}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#6C757D' }}>
-                      {PROVIDER_LABELS[p.provider]} • Réf. {p.reference}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1D9E75' }}>
-                      +{formatXOF(creance.totalPaye)}
-                    </div>
-                    {p.datePaiement && (
-                      <div style={{ fontSize: 10, color: '#ADB5BD' }}>
-                        {new Date(p.datePaiement).toLocaleDateString('fr-FR')}
+            {creances.filter(c => c.totalPaye > 0).length === 0 ? (
+              <div style={{ padding: 32, textAlign: 'center', color: '#6C757D', fontSize: 13 }}>
+                Aucune transaction enregistrée.
+              </div>
+            ) : (
+              creances.filter(c => c.totalPaye > 0).map((creance, idx, arr) => {
+                const p = creance.paiements[0] || { provider: 'especes', reference: 'N/A' };
+                const providerKey = p.provider in PROVIDER_LABELS ? p.provider : 'especes';
+                const nomClasse = mapClasses[creance.eleve.classeId] || 'Classe N/A';
+                
+                return (
+                  <div key={creance.eleveId} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px',
+                    borderBottom: idx < arr.length - 1 ? '0.5px solid #F0F0F0' : 'none',
+                  }}>
+                    <span style={{ fontSize: 18 }}>
+                      {{ orange_money: '🟠', wave: '🔵', mtn_money: '🟡', moov_money: '🟢', carte_bancaire: '💳', especes: '💵' }[providerKey] || '💵'}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>
+                        {creance.eleve.nom} {creance.eleve.prenom}
                       </div>
-                    )}
+                      <div style={{ fontSize: 11, color: '#6C757D' }}>
+                        {nomClasse} • {PROVIDER_LABELS[providerKey] || p.provider} • Réf. {p.reference}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1D9E75' }}>
+                        +{formatXOF(creance.totalPaye)}
+                      </div>
+                      {p.datePaiement && (
+                        <div style={{ fontSize: 10, color: '#ADB5BD' }}>
+                          {new Date(p.datePaiement).toLocaleDateString('fr-FR')}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#EAF3DE', color: '#27500A', fontWeight: 500 }}>
+                      ✓ Payé
+                    </span>
                   </div>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#EAF3DE', color: '#27500A', fontWeight: 500 }}>
-                    ✓ Payé
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
       </main>

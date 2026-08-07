@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from '../../utils/supabaseClient';
 
 interface AbsencesProps {
   ecoleId: string;
@@ -34,15 +34,19 @@ interface ClasseSummary {
 }
 
 // ─────────────────────────────────────────────
-// ÉTAPE 2 : FONCTION DE DÉTECTION DU CRÉNEAU
+// ÉTAPE 2 : FONCTION DE DÉTECTION DU CRÉNEAU (Harmonisée)
 // ─────────────────────────────────────────────
 const getCreneauActuel = (): string => {
   const heure = new Date().getHours();
   if (heure >= 7 && heure < 9) return '08:00-09:00';
   if (heure >= 9 && heure < 11) return '09:00-11:00';
   if (heure >= 11 && heure < 13) return '11:00-13:00';
+  if (heure >= 13 && heure < 15) return '13:00-15:00';
   if (heure >= 15 && heure < 17) return '15:00-17:00';
-  return `Session-${heure}h`; // Créneau automatique selon l'heure courante
+  
+  const hDeb = String(heure).padStart(2, '0');
+  const hFin = String((heure + 1) % 24).padStart(2, '0');
+  return `${hDeb}:00-${hFin}:00`;
 };
 
 export default function Absences({ ecoleId, onBack, isOnline }: AbsencesProps) {
@@ -109,15 +113,13 @@ export default function Absences({ ecoleId, onBack, isOnline }: AbsencesProps) {
 
       const tousLesEleves = dbStudents || [];
 
-      // B. Récupération des absences filtrées par date et créneau actuel
+      // B. Récupération de TOUTES les absences de la journée sélectionnée
       let dbAbsences: any[] = [];
       try {
-        const creneauCourant = getCreneauActuel();
         const { data: dataAbs, error: errAbs } = await supabase
           .from('absences')
           .select('*')
-          .eq('date', dateSelectionnee)
-          .eq('time_slot', creneauCourant);
+          .eq('date', dateSelectionnee);
 
         if (errAbs) {
           console.warn('Avertissement lecture table absences :', errAbs.message);
