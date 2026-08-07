@@ -1,16 +1,13 @@
 // ─────────────────────────────────────────────
 // AIDEDUC West Africa — Dashboard.tsx
 // src/components/Dashboard.tsx
-// Interface d'accueil pour Directeur / Enseignant
+// Interface d'accueil pour l'établissement
 // ─────────────────────────────────────────────
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type {
   User,
-  Eleve,
-  Paiement,
-  Notification,
   UserRole,
 } from '../types';
 
@@ -65,17 +62,24 @@ function timeAgo(dateStr: string): string {
   return `Il y a ${days} jour${days > 1 ? 's' : ''}`;
 }
 
-// ─── ACCÈS RAPIDES (UNIQUEMENT POUR LE DIRECTEUR) ───
+// ─── ACCÈS RAPIDES POUR CHAQUE RÔLE ───
 const QUICK_ACTIONS: Record<UserRole, Array<{ label: string; route: string; icon: string; color: string }>> = {
   directeur: [
     { label: 'Gérer les absences', route: '/absences',  icon: '📅', color: '#1D9E75' },
     { label: 'Suivi paiements',    route: '/scolarite', icon: '💳', color: '#BA7517' },
   ],
-  enseignant:  [],
-  comptable:   [],
-  parent:      [],
-  eleve:       [],
-  super_admin: [],
+  censeur: [
+    { label: 'Gestion Absences',   route: '/absences',  icon: '📝', color: '#1D9E75' },
+    { label: 'Saisie des Notes',   route: '/notes',     icon: '📊', color: '#534AB7' },
+  ],
+  enseignant: [
+    { label: "Faire l'appel",      route: '/absences',  icon: '📅', color: '#185FA5' },
+    { label: 'Cahier de texte',    route: '/cahier',    icon: '📚', color: '#BA7517' },
+  ],
+  comptable: [
+    { label: 'Encaisser Frais',    route: '/scolarite', icon: '💳', color: '#1D9E75' },
+    { label: 'Relances Impayés',   route: '/relances',  icon: '📩', color: '#E24B4A' },
+  ],
 };
 
 // ─── Sous-composants ─────────────────────────
@@ -272,6 +276,14 @@ export default function Dashboard({ user, onNavigate }: DashboardProps) {
   function handleReadNotif(id: string) {
     setNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, lu: true } : n)
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', fontFamily: 'system-ui, sans-serif', color: '#1B3A5C' }}>
+        Chargement du tableau de bord...
+      </div>
     );
   }
 

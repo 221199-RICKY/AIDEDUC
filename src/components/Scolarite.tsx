@@ -5,7 +5,7 @@
 // Canal de Relance : WhatsApp (déclenché via parentTel)
 // ─────────────────────────────────────────────
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import  { useState, useMemo, useCallback, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type {
   Creance,
@@ -13,6 +13,7 @@ import type {
   StatutPaiement,
   ProviderMobileMoney,
   Eleve,
+  TypeFrais,
 } from '../types';
 
 type FiltreStatut = 'tous' | StatutPaiement;
@@ -296,7 +297,7 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
                 id: '',
                 ecoleId: String(student.school_id || ecoleId),
                 anneeScolaire: schoolData?.annee_scolaire_courante || '',
-                typeFrais: 'scolarite',
+                typeFrais: 'Scolarité' as TypeFrais,
                 montant: totalDu,
                 devise: 'XOF',
                 description: 'Frais de Scolarité'

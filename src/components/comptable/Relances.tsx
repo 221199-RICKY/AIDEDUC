@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 
 interface RelancesProps {
   onBack: () => void
@@ -12,7 +12,7 @@ const impayesInitiaux = [
 ]
 
 export default function Relances({ onBack }: RelancesProps) {
-  const [liste, setListe] = useState(impayesInitiaux)
+  const [liste] = useState(impayesInitiaux)
 
   const envoyerRelanceWhatsApp = (eleve: typeof impayesInitiaux[0]) => {
     // Message personnalisé automatique

@@ -8,10 +8,10 @@ import logoAideduc from './assets/Logo AIDEDUC.png'
 import Dashboard from './components/Dashboard'
 import Scolarite from './components/Scolarite'
 
-// ── IMPORTATION DES COMPOSANTS CENSEUR (Noms de fichiers corrigés) ──
-import GestionAbsencesCenseur from './components/censeur/GestionAbsencesCenseur'
+// ── IMPORTATION DES COMPOSANTS CENSEUR ──
+import Absences from './components/censeur/Absences'
 import SuiviCours from './components/censeur/SuiviCours'
-import AffectationsCours from './components/censeur/AffectationsCours'
+import AffectationsCours from './components/censeur/affectationscours'
 
 // Importations des vues Enseignant
 import FaireAppel from './components/enseignant/FaireAppel'
@@ -23,10 +23,11 @@ import Encaissement from './components/comptable/Encaissement'
 import SuiviRelances from './components/comptable/SuiviRelances'
 import TableauBordComptable from './components/comptable/TableauBordComptable'
 import ImportExcel from './components/comptable/ImportExcel'
-
+  
 import type { User } from './types'
 
-type Profil = 'directeur' | 'censeur' | 'enseignant' | 'comptable' | 'eleve' | 'parent'
+// Restriction stricte aux 4 rôles de l'établissement
+type Profil = 'directeur' | 'censeur' | 'enseignant' | 'comptable'
 
 interface OngletNavigation {
   id: string
@@ -55,13 +56,13 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // États pour le formulaire d'inscription
+  // États pour le formulaire d'inscription (seuls les 4 rôles sont accessibles)
   const [registerForm, setRegisterForm] = useState({
     nom: '',
     prenom: '',
     email: '',
     password: '',
-    role: 'enseignant',
+    role: 'enseignant' as Profil,
     codeEcole: '',
   })
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null)
@@ -119,15 +120,25 @@ export default function App() {
 
       if (profileError || !profileData) throw new Error('Profil introuvable')
 
+      const { data: authUser } = await supabase.auth.getUser()
+
+      // Sécurisation du typage vers l'un des 4 rôles autorisés
+      const userRole = (profileData.role || 'enseignant') as Profil
+
+      // Construction complète de l'objet User pour respecter l'interface TS
       const utilisateurFormate: User = {
         id: profileData.id,
-        nom: profileData.last_name,
-        prenom: profileData.first_name,
-        role: profileData.role,
+        nom: profileData.last_name || '',
+        prenom: profileData.first_name || '',
+        role: userRole,
+        email: authUser.user?.email || '',
+        telephone: '',
+        ecoleId: profileData.school_id || '',
+        langue: 'fr',
+        createdAt: new Date().toISOString(),
       }
 
       setCurrentUser(utilisateurFormate)
-      const userRole = profileData.role as Profil
       setProfil(userRole)
       setVue('app')
 
@@ -135,7 +146,6 @@ export default function App() {
       else if (userRole === 'censeur') setCurrentTab('tableau_pedagogique')
       else if (userRole === 'comptable') setCurrentTab('comptable/dashboard')
       else if (userRole === 'enseignant') setCurrentTab('enseignant/appel')
-      else setCurrentTab('')
     } catch (err) {
       console.error('Erreur lors de la récupération du profil:', err)
       supabase.auth.signOut()
@@ -592,7 +602,7 @@ export default function App() {
               </label>
               <select
                 value={registerForm.role}
-                onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}
+                onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value as Profil })}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -605,6 +615,7 @@ export default function App() {
                 <option value="enseignant">Enseignant</option>
                 <option value="censeur">Censeur</option>
                 <option value="comptable">Comptable</option>
+                <option value="directeur">Directeur</option>
               </select>
             </div>
 
@@ -1044,14 +1055,18 @@ export default function App() {
 
             {currentTab === 'suivi_finances' && (
               <Scolarite
-                ecoleId="11111111-1111-1111-1111-111111111111"
+                ecoleId={currentUser?.ecoleId || ''}
                 onBack={() => setCurrentTab('vue_globale')}
                 isOnline={navigator.onLine}
               />
             )}
 
             {currentTab === 'suivi_absences' && (
-              <GestionAbsencesCenseur onBack={() => setCurrentTab('vue_globale')} />
+              <Absences
+              ecoleId={currentUser?.ecoleId || ''}
+               onBack={() => setCurrentTab('vue_globale')}
+               isOnline={navigator.onLine}
+               />
             )}
 
             {currentTab === 'affectations_cours' && (
@@ -1126,7 +1141,11 @@ export default function App() {
               <AffectationsCours onBack={() => setCurrentTab('tableau_pedagogique')} />
             )}
             {currentTab === 'gestion_absences' && (
-              <GestionAbsencesCenseur onBack={() => setCurrentTab('tableau_pedagogique')} />
+            <Absences 
+             ecoleId={currentUser?.ecoleId || ''} 
+             onBack={() => setCurrentTab('tableau_pedagogique')} 
+             isOnline={navigator.onLine} 
+            />
             )}
             {currentTab === 'suivi_cours' && (
               <SuiviCours onBack={() => setCurrentTab('tableau_pedagogique')} />

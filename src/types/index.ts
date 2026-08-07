@@ -8,9 +8,7 @@ export type UserRole =
   | 'directeur'
   | 'enseignant'
   | 'comptable'
-  | 'parent'
-  | 'eleve'
-  | 'super_admin';
+  | 'censeur';
 
 // ── UTILISATEUR AUTHENTIFIÉ ───────────────────
 export interface User {

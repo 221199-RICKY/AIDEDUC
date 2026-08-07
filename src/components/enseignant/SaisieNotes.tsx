@@ -111,12 +111,7 @@ function calcMoyInterros(bloc?: Partial<Record<TypeEpreuve, string>>): number | 
   return vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null
 }
 
-function calcMoyDevoirs(bloc?: Partial<Record<TypeEpreuve, string>>): number | null {
-  const vals = (['Devoir 1', 'Devoir 2'] as const)
-    .map((ep) => parseNote(bloc?.[ep] ?? ''))
-    .filter((v): v is number => v !== null)
-  return vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null
-}
+
 
 // Moyenne = (Moyenne Interros + Devoir 1 + Devoir 2) / 3
 function calcMoyMatiere(bloc?: Partial<Record<TypeEpreuve, string>>): number | null {

@@ -3,7 +3,7 @@
 // Correctif Erreurs 400 / 404 & Gestion par Créneaux / Cours
 // ─────────────────────────────────────────────
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import  { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../utils/supabaseClient';
 
 interface AbsencesProps {
@@ -49,7 +49,7 @@ const getCreneauActuel = (): string => {
   return `${hDeb}:00-${hFin}:00`;
 };
 
-export default function Absences({ ecoleId, onBack, isOnline }: AbsencesProps) {
+export default function Absences({ ecoleId, onBack, }: AbsencesProps) {
   const [dateSelectionnee, setDateSelectionnee] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
