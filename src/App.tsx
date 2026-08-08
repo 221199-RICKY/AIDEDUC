@@ -24,7 +24,7 @@ import Encaissement from './components/comptable/Encaissement'
 import SuiviRelances from './components/comptable/SuiviRelances'
 import TableauBordComptable from './components/comptable/TableauBordComptable'
 import ImportExcel from './components/comptable/ImportExcel'
-  
+
 import type { User } from './types'
 
 type Profil = 'directeur' | 'censeur' | 'enseignant' | 'comptable'
@@ -276,7 +276,7 @@ export default function App() {
           <img
             src={logoAideduc}
             alt="AIDEDUC"
-            className="h-10 w-auto object-contain mx-auto mb-4"
+            className="h-12 w-auto object-contain mx-auto mb-4"
           />
           <div className="text-gray-600 font-semibold text-sm">
             Chargement des données...
@@ -286,7 +286,7 @@ export default function App() {
     )
   }
 
-  // ÉCRAN DE CONNEXION
+  // ── 1. ÉCRAN DE CONNEXION ──
   if (vue === 'connexion') {
     return (
       <div className="flex min-h-screen bg-gray-50 items-center justify-center p-4 font-sans">
@@ -295,7 +295,7 @@ export default function App() {
             <img
               src={logoAideduc}
               alt="AIDEDUC Logo"
-              className="h-10 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
           </div>
 
@@ -364,7 +364,7 @@ export default function App() {
     )
   }
 
-  // ÉCRAN D'INSCRIPTION
+  // ── 2. ÉCRAN D'INSCRIPTION ──
   if (vue === 'inscription') {
     return (
       <div className="flex min-h-screen bg-gray-50 items-center justify-center p-4 font-sans">
@@ -373,7 +373,7 @@ export default function App() {
             <img
               src={logoAideduc}
               alt="AIDEDUC Logo"
-              className="h-10 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
           </div>
 
@@ -507,27 +507,10 @@ export default function App() {
     )
   }
 
-  // CONTENEUR PRINCIPAL DE L'APPLICATION
+  // ── 3. INTERFACE PRINCIPALE UNE FOIS CONNECTÉ ──
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
-      {/* HEADER MOBILE HAMBURGER */}
-      <header className="md:hidden bg-slate-800 text-white px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-sm">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="text-xl text-white p-1 hover:bg-slate-700 rounded transition-colors"
-            aria-label="Ouvrir le menu"
-          >
-            ☰
-          </button>
-          <img src={logoAideduc} alt="AIDEDUC" className="h-10 w-auto object-contain" />
-        </div>
-        <span className="text-xs uppercase bg-slate-700 px-2 py-1 rounded font-bold text-slate-300">
-          {profil}
-        </span>
-      </header>
-
-      {/* COMPOSANT SIDEBAR */}
+      {/* SIDEBAR RESPONSIVE */}
       <Sidebar
         profil={profil}
         currentUser={currentUser}
@@ -541,8 +524,23 @@ export default function App() {
         onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* ZONE DE CONTENU PRINCIPAL PRENANT TOUT L'ESPACE RESTANT */}
+      {/* ZONE DE CONTENU PRINCIPAL */}
       <main className="flex-1 w-full overflow-x-hidden p-4 md:p-8">
+        {/* BARRE HAMBURGER MOBILE (AUCUN LOGO REPETÉ) */}
+        <div className="md:hidden mb-4 flex items-center justify-between bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="flex items-center gap-2 text-slate-800 font-bold text-lg p-1 hover:bg-gray-100 rounded transition-colors"
+            aria-label="Ouvrir le menu"
+          >
+            <span>≡</span>
+            <span className="text-xs uppercase font-semibold text-slate-600">Menu</span>
+          </button>
+          <span className="text-xs uppercase bg-slate-800 text-white px-2.5 py-1 rounded-md font-bold">
+            {profil}
+          </span>
+        </div>
+
         {/* BANNIÈRE DIRECTEUR */}
         {profil === 'directeur' && (
           <div className="bg-amber-100 border border-amber-500 rounded-lg p-3 md:p-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -566,27 +564,35 @@ export default function App() {
         {profil === 'directeur' && (
           <>
             {currentTab === 'vue_globale' && currentUser && (
-              <Dashboard user={currentUser} onNavigate={handleNavigate} />
+              <div className="overflow-x-auto w-full">
+                <Dashboard user={currentUser} onNavigate={handleNavigate} />
+              </div>
             )}
 
             {currentTab === 'suivi_finances' && (
-              <Scolarite
-                ecoleId={currentUser?.ecoleId || ''}
-                onBack={() => setCurrentTab('vue_globale')}
-                isOnline={navigator.onLine}
-              />
+              <div className="overflow-x-auto w-full">
+                <Scolarite
+                  ecoleId={currentUser?.ecoleId || ''}
+                  onBack={() => setCurrentTab('vue_globale')}
+                  isOnline={navigator.onLine}
+                />
+              </div>
             )}
 
             {currentTab === 'suivi_absences' && (
-              <Absences
-                ecoleId={currentUser?.ecoleId || ''}
-                onBack={() => setCurrentTab('vue_globale')}
-                isOnline={navigator.onLine}
-              />
+              <div className="overflow-x-auto w-full">
+                <Absences
+                  ecoleId={currentUser?.ecoleId || ''}
+                  onBack={() => setCurrentTab('vue_globale')}
+                  isOnline={navigator.onLine}
+                />
+              </div>
             )}
 
             {currentTab === 'affectations_cours' && (
-              <AffectationsCours onBack={() => setCurrentTab('vue_globale')} />
+              <div className="overflow-x-auto w-full">
+                <AffectationsCours onBack={() => setCurrentTab('vue_globale')} />
+              </div>
             )}
           </>
         )}
@@ -623,17 +629,23 @@ export default function App() {
               </div>
             )}
             {currentTab === 'affectations_cours' && (
-              <AffectationsCours onBack={() => setCurrentTab('tableau_pedagogique')} />
+              <div className="overflow-x-auto w-full">
+                <AffectationsCours onBack={() => setCurrentTab('tableau_pedagogique')} />
+              </div>
             )}
             {currentTab === 'gestion_absences' && (
-              <Absences 
-                ecoleId={currentUser?.ecoleId || ''} 
-                onBack={() => setCurrentTab('tableau_pedagogique')} 
-                isOnline={navigator.onLine} 
-              />
+              <div className="overflow-x-auto w-full">
+                <Absences 
+                  ecoleId={currentUser?.ecoleId || ''} 
+                  onBack={() => setCurrentTab('tableau_pedagogique')} 
+                  isOnline={navigator.onLine} 
+                />
+              </div>
             )}
             {currentTab === 'suivi_cours' && (
-              <SuiviCours onBack={() => setCurrentTab('tableau_pedagogique')} />
+              <div className="overflow-x-auto w-full">
+                <SuiviCours onBack={() => setCurrentTab('tableau_pedagogique')} />
+              </div>
             )}
           </>
         )}
@@ -641,9 +653,21 @@ export default function App() {
         {/* ESPACE ENSEIGNANTS */}
         {profil === 'enseignant' && (
           <>
-            {currentTab === 'enseignant/appel' && <FaireAppel onBack={handleLogout} />}
-            {currentTab === 'enseignant/cahier' && <CahierTexte onBack={handleLogout} />}
-            {currentTab === 'enseignant/notes' && <SaisieNotes onBack={handleLogout} />}
+            {currentTab === 'enseignant/appel' && (
+              <div className="overflow-x-auto w-full">
+                <FaireAppel onBack={handleLogout} />
+              </div>
+            )}
+            {currentTab === 'enseignant/cahier' && (
+              <div className="overflow-x-auto w-full">
+                <CahierTexte onBack={handleLogout} />
+              </div>
+            )}
+            {currentTab === 'enseignant/notes' && (
+              <div className="overflow-x-auto w-full">
+                <SaisieNotes onBack={handleLogout} />
+              </div>
+            )}
           </>
         )}
 
@@ -651,14 +675,24 @@ export default function App() {
         {profil === 'comptable' && (
           <>
             {currentTab === 'comptable/dashboard' && (
-              <TableauBordComptable onBack={() => setCurrentTab('comptable/dashboard')} />
+              <div className="overflow-x-auto w-full">
+                <TableauBordComptable onBack={() => setCurrentTab('comptable/dashboard')} />
+              </div>
             )}
             {currentTab === 'comptable/encaissement' && (
-              <Encaissement onBack={() => setCurrentTab('comptable/dashboard')} />
+              <div className="overflow-x-auto w-full">
+                <Encaissement onBack={() => setCurrentTab('comptable/dashboard')} />
+              </div>
             )}
-            {currentTab === 'comptable/relances' && <SuiviRelances onBack={handleLogout} />}
+            {currentTab === 'comptable/relances' && (
+              <div className="overflow-x-auto w-full">
+                <SuiviRelances onBack={handleLogout} />
+              </div>
+            )}
             {currentTab === 'comptable/import' && (
-              <ImportExcel onBack={() => setCurrentTab('comptable/dashboard')} />
+              <div className="overflow-x-auto w-full">
+                <ImportExcel onBack={() => setCurrentTab('comptable/dashboard')} />
+              </div>
             )}
           </>
         )}

@@ -53,16 +53,16 @@ export default function Sidebar({
       <aside
         className={`
           bg-slate-800 text-white p-5 flex flex-col justify-between z-50
-          md:w-64 md:flex-shrink-0 md:min-h-screen md:flex md:static
+          md:w-64 md:flex-shrink-0 md:min-h-screen md:static
           ${
             isOpen
-              ? 'fixed inset-0 w-full h-full bg-slate-900 overflow-y-auto flex'
+              ? 'fixed inset-0 w-full bg-slate-900 flex flex-col'
               : 'hidden md:flex'
           }
         `}
       >
         <div>
-          {/* HEADER SIDEBAR + BOUTON FERMER SUR MOBILE */}
+          {/* HEADER SIDEBAR (LOGO UNIQUE + FERMETURE MOBILE) */}
           <div className="pb-4 border-b border-slate-700 mb-5 relative flex flex-col items-center">
             {isOpen && (
               <button
@@ -74,12 +74,12 @@ export default function Sidebar({
               </button>
             )}
 
-            {/* TAILLE D'IMAGE STRICTEMENT LIMITÉE */}
+            {/* LOGO UNIQUE AVEC TAILLE CALIBRÉE */}
             <div className="flex items-center justify-center w-full py-2">
               <img
                 src={logoAideduc}
                 alt="AIDEDUC"
-                className="h-10 w-auto object-contain max-w-full"
+                className="h-10 w-auto object-contain"
               />
             </div>
 
@@ -103,7 +103,9 @@ export default function Sidebar({
                   key={tab.id}
                   onClick={() => handleSelectTab(tab.id)}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === tab.id ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === tab.id
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   <span className="mr-2">{tab.icon}</span> {tab.label}
@@ -116,7 +118,9 @@ export default function Sidebar({
                   key={tab.id}
                   onClick={() => handleSelectTab(tab.id)}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === tab.id ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === tab.id
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   <span className="mr-2">{tab.icon}</span> {tab.label}
@@ -128,7 +132,9 @@ export default function Sidebar({
                 <button
                   onClick={() => handleSelectTab('comptable/dashboard')}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === 'comptable/dashboard' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === 'comptable/dashboard'
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📊 Tableau de Bord
@@ -136,7 +142,9 @@ export default function Sidebar({
                 <button
                   onClick={() => handleSelectTab('comptable/encaissement')}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === 'comptable/encaissement' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === 'comptable/encaissement'
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   💵 Saisie Encaissement
@@ -144,7 +152,9 @@ export default function Sidebar({
                 <button
                   onClick={() => handleSelectTab('comptable/import')}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === 'comptable/import' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === 'comptable/import'
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📥 Import Données Excel
@@ -152,7 +162,9 @@ export default function Sidebar({
                 <button
                   onClick={() => handleSelectTab('comptable/relances')}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === 'comptable/relances' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === 'comptable/relances'
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📨 Suivi des Relances
@@ -165,7 +177,9 @@ export default function Sidebar({
                 <button
                   onClick={() => handleSelectTab('enseignant/appel')}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === 'enseignant/appel' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === 'enseignant/appel'
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📝 Faire l'Appel
@@ -173,7 +187,9 @@ export default function Sidebar({
                 <button
                   onClick={() => handleSelectTab('enseignant/cahier')}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === 'enseignant/cahier' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === 'enseignant/cahier'
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📚 Cahier de Textes
@@ -181,7 +197,9 @@ export default function Sidebar({
                 <button
                   onClick={() => handleSelectTab('enseignant/notes')}
                   className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
-                    currentTab === 'enseignant/notes' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
+                    currentTab === 'enseignant/notes'
+                      ? 'bg-slate-950 font-bold'
+                      : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📊 Saisie des Notes
