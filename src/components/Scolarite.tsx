@@ -5,7 +5,7 @@
 // Canal de Relance : WhatsApp (déclenché via parentTel)
 // ─────────────────────────────────────────────
 
-import  { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type {
   Creance,
@@ -30,10 +30,10 @@ function formatXOF(n: number): string {
 }
 
 const STATUT_CONFIG: Record<StatutPaiement, { label: string; bg: string; text: string }> = {
-  paye:       { label: '✓ Payé',       bg: '#EAF3DE', text: '#27500A' },
-  partiel:    { label: '½ Partiel',    bg: '#EEEDFE', text: '#3C3489' },
-  en_attente: { label: '⏳ En attente', bg: '#FAEEDA', text: '#633806' },
-  retard:     { label: '⚠ Retard',     bg: '#FCEBEB', text: '#A32D2D' },
+  paye:       { label: '✓ Payé',       bg: 'bg-emerald-100', text: 'text-emerald-800' },
+  partiel:    { label: '½ Partiel',    bg: 'bg-indigo-100',  text: 'text-indigo-800' },
+  en_attente: { label: '⏳ En attente', bg: 'bg-amber-100',   text: 'text-amber-800' },
+  retard:     { label: '⚠ Retard',     bg: 'bg-rose-100',    text: 'text-rose-800' },
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -45,7 +45,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   especes:        '💵 Espèces',
 };
 
-// ─── Sous-composant Ligne Créance ─────────────
+// ─── Sous-composant Ligne Créance (100% RESPONSIVE TAILWIND) ─────────────
 
 interface CreanceRowProps {
   creance: Creance & { telephoneParent?: string };
@@ -64,86 +64,72 @@ function CreanceRow({ creance, nomClasse, onRelance, relanceEnCours, relanceEnvo
   const initiales = `${prenomInit}${nomInit}`.toUpperCase() || 'E';
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 14px',
-      borderBottom: '0.5px solid #F0F0F0',
-      background: urgent ? '#FFF9F9' : '#fff',
-    }}>
-      {/* Avatar */}
-      <div style={{
-        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-        background: urgent ? '#FCEBEB' : '#F0F4F8',
-        color: urgent ? '#A32D2D' : '#495057',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, fontWeight: 700,
-      }}>
+    <div className={`flex items-center gap-3 p-3.5 border-b border-slate-100 transition-colors ${urgent ? 'bg-red-50/50' : 'bg-white'}`}>
+      
+      {/* 1. À GAUCHE : AVATAR (INITIALES) */}
+      <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-xs font-bold ${urgent ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
         {initiales}
       </div>
 
-      {/* Nom + Nom de la Classe */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E' }}>
+      {/* 2. AU MILIEU : BLOC D'INFORMATIONS ÉLÈVE (FLEX-1) */}
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        {/* Nom & Prénom */}
+        <span className="text-sm font-semibold text-slate-900 truncate">
           {creance.eleve.prenom} {creance.eleve.nom}
-        </div>
-        <div style={{ fontSize: 11, color: '#6C757D', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-          {/* Badge Classe */}
-          <span style={{
-            background: '#E9ECEF', color: '#495057',
-            padding: '1px 6px', borderRadius: 4, fontWeight: 600, fontSize: 10
-          }}>
+        </span>
+
+        {/* Badge Classe */}
+        <div>
+          <span className="inline-block bg-slate-100 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded border border-slate-200">
             {nomClasse}
           </span>
+        </div>
 
-          {creance.joursRetard > 0 && (
-            <span style={{ color: urgent ? '#A32D2D' : '#BA7517' }}>
-              • {creance.joursRetard}j de retard
+        {/* Montant Dû / Solde */}
+        <div className="text-xs font-medium">
+          {creance.solde < 0 ? (
+            <span className="text-red-600 font-semibold">
+              − {formatXOF(Math.abs(creance.solde))}
             </span>
+          ) : (
+            <span className="text-emerald-600 font-semibold">✓ Soldé</span>
           )}
+          <span className="text-[11px] text-slate-400 font-normal ml-1">
+            sur {formatXOF(creance.totalDu)}
+          </span>
         </div>
+
+        {/* Retard */}
+        {creance.joursRetard > 0 && (
+          <span className={`text-[11px] font-medium ${urgent ? 'text-red-600' : 'text-amber-600'}`}>
+            • {creance.joursRetard}j de retard
+          </span>
+        )}
       </div>
 
-      {/* Montant */}
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{
-          fontSize: 13, fontWeight: 600,
-          color: creance.solde < 0 ? '#A32D2D' : '#1D9E75',
-        }}>
-          {creance.solde < 0 ? `− ${formatXOF(Math.abs(creance.solde))}` : '✓ Soldé'}
-        </div>
-        <div style={{ fontSize: 10, color: '#ADB5BD' }}>
-          sur {formatXOF(creance.totalDu)}
-        </div>
+      {/* 3. À DROITE : BADGE DE STATUT + BOUTON D'ACTION */}
+      <div className="shrink-0 flex flex-col items-end gap-2">
+        {/* Badge Statut */}
+        <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
+          {cfg.label}
+        </span>
+
+        {/* Bouton relance WhatsApp */}
+        {paiement && paiement.statut !== 'paye' && (
+          <button
+            onClick={() => onRelance(creance)}
+            disabled={relanceEnCours}
+            className={`text-xs px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 transition-colors ${
+              relanceEnvoyee 
+                ? 'bg-emerald-100 text-emerald-800' 
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            }`}
+          >
+            {relanceEnvoyee ? '✓ Relancé' : relanceEnCours ? '…' : '💬 WhatsApp'}
+          </button>
+        )}
       </div>
 
-      {/* Statut */}
-      <span style={{
-        fontSize: 10, padding: '3px 8px', borderRadius: 20, fontWeight: 500,
-        background: cfg.bg, color: cfg.text, flexShrink: 0,
-      }}>
-        {cfg.label}
-      </span>
-
-      {/* Bouton relance WhatsApp */}
-      {paiement && paiement.statut !== 'paye' && (
-        <button
-          onClick={() => onRelance(creance)}
-          disabled={relanceEnCours}
-          style={{
-            fontSize: 11, padding: '5px 10px', borderRadius: 6, flexShrink: 0,
-            border: 'none',
-            background: relanceEnvoyee ? '#DCFCE7' : '#25D366',
-            color: relanceEnvoyee ? '#15803D' : '#ffffff',
-            cursor: relanceEnCours ? 'default' : 'pointer',
-            fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}
-        >
-          {relanceEnvoyee ? '✓ Relancé' : relanceEnCours ? '…' : '💬 WhatsApp'}
-        </button>
-      )}
     </div>
   );
 }
@@ -431,9 +417,9 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', backgroundColor: '#F5F7FA' }}>
-        <div style={{ textAlign: 'center', color: '#1B3A5C', fontWeight: '500' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>⚡</div>
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="text-center text-slate-800 font-medium">
+          <div className="text-3xl mb-3">⚡</div>
           Chargement des classes et des frais...
         </div>
       </div>
@@ -441,120 +427,89 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
   }
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', background: '#F5F7FA', minHeight: '100vh' }}>
+    <div className="bg-slate-50 min-h-screen">
 
       {/* ── HEADER ── */}
-      <header style={{
-        background: '#1B3A5C', color: '#fff',
-        padding: '14px 20px',
-        position: 'sticky', top: 0, zIndex: 100,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <header className="bg-slate-900 text-white p-4 sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <button
             onClick={onBack}
-            style={{
-              background: 'rgba(255,255,255,0.15)', border: 'none',
-              borderRadius: 8, width: 32, height: 32, cursor: 'pointer',
-              color: '#fff', fontSize: 18, display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-            }}
+            className="bg-white/15 hover:bg-white/25 border-none rounded-lg w-8 h-8 cursor-pointer text-white text-lg flex items-center justify-center transition-colors"
             aria-label="Retour"
           >
             ←
           </button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>Frais de scolarité</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>
+          <div className="flex-1 min-w-0">
+            <div className="text-base font-semibold truncate">Frais de scolarité</div>
+            <div className="text-xs text-white/75 truncate">
               {periodeEncours || 'Suivi Financier'} {nomEcole ? `— ${nomEcole}` : ''} {anneeEncours ? `• ${anneeEncours}` : ''}
             </div>
           </div>
           {!isOnline && (
-            <span style={{
-              fontSize: 11, padding: '3px 10px', borderRadius: 20,
-              background: '#FAEEDA', color: '#633806', fontWeight: 500,
-            }}>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-medium shrink-0">
               ⚡ Hors ligne
             </span>
           )}
           <button
             onClick={handleRelancerTous}
-            style={{
-              padding: '7px 14px', borderRadius: 8, border: 'none',
-              background: '#25D366', color: '#fff', fontWeight: 600,
-              fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
-            }}
+            className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors"
           >
             💬 Relancer par WhatsApp
           </button>
         </div>
       </header>
 
-      <main style={{ padding: '16px 20px', maxWidth: 900, margin: '0 auto' }}>
+      <main className="p-4 max-w-4xl mx-auto space-y-4">
 
         {errorMsg && (
-          <div style={{ backgroundColor: '#FCEBEB', color: '#A32D2D', padding: '12px 16px', borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+          <div className="bg-rose-50 text-rose-700 p-3 rounded-lg text-sm border border-rose-200">
             ⚠️ {errorMsg}
           </div>
         )}
 
         {/* ── KPIs DYNAMIQUES ── */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: 10, marginBottom: 20,
-        }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total attendu',      value: formatXOF(stats.total),    color: '#1A1A2E', icon: '🏫' },
-            { label: 'Encaissé',           value: formatXOF(stats.encaisse), color: '#1D9E75', icon: '✅' },
-            { label: 'Reste à collecter',  value: formatXOF(stats.reste),    color: '#E24B4A', icon: '⚠️' },
-            { label: 'Taux recouvrement',  value: `${stats.taux} %`,         color: stats.taux >= 80 ? '#1D9E75' : '#BA7517', icon: '📊' },
+            { label: 'Total attendu',      value: formatXOF(stats.total),    color: 'text-slate-900', icon: '🏫' },
+            { label: 'Encaissé',           value: formatXOF(stats.encaisse), color: 'text-emerald-600', icon: '✅' },
+            { label: 'Reste à collecter',  value: formatXOF(stats.reste),    color: 'text-rose-600', icon: '⚠️' },
+            { label: 'Taux recouvrement',  value: `${stats.taux} %`,         color: stats.taux >= 80 ? 'text-emerald-600' : 'text-amber-600', icon: '📊' },
           ].map(k => (
-            <div key={k.label} style={{
-              background: '#fff', border: '0.5px solid #DEE2E6',
-              borderRadius: 12, padding: '12px 14px',
-            }}>
-              <div style={{ fontSize: 20, marginBottom: 6 }}>{k.icon}</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: 11, color: '#6C757D', marginTop: 3 }}>{k.label}</div>
+            <div key={k.label} className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
+              <div className="text-xl mb-1">{k.icon}</div>
+              <div className={`text-base sm:text-lg font-bold truncate ${k.color}`}>{k.value}</div>
+              <div className="text-xs text-slate-500 mt-1">{k.label}</div>
             </div>
           ))}
         </div>
 
         {/* Barre de progression */}
-        <div style={{
-          background: '#fff', border: '0.5px solid #DEE2E6',
-          borderRadius: 10, padding: '12px 14px', marginBottom: 16,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: '#6C757D' }}>Recouvrement global</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: stats.taux >= 80 ? '#1D9E75' : '#BA7517' }}>
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
+          <div className="flex justify-between mb-1.5 text-xs">
+            <span className="text-slate-500">Recouvrement global</span>
+            <span className={`font-semibold ${stats.taux >= 80 ? 'text-emerald-600' : 'text-amber-600'}`}>
               {stats.taux} %
             </span>
           </div>
-          <div style={{
-            height: 8, background: '#F0F0F0', borderRadius: 4, overflow: 'hidden',
-          }}>
-            <div style={{
-              height: '100%', borderRadius: 4,
-              width: `${stats.taux}%`,
-              background: stats.taux >= 80 ? '#1D9E75' : stats.taux >= 60 ? '#BA7517' : '#E24B4A',
-              transition: 'width 0.4s ease',
-            }} />
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                stats.taux >= 80 ? 'bg-emerald-500' : stats.taux >= 60 ? 'bg-amber-500' : 'bg-rose-500'
+              }`}
+              style={{ width: `${stats.taux}%` }}
+            />
           </div>
         </div>
 
         {/* ── ONGLETS ── */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 14, borderBottom: '0.5px solid #DEE2E6' }}>
+        <div className="flex border-b border-slate-200 gap-4">
           {(['creances', 'transactions'] as const).map(o => (
             <button
               key={o}
               onClick={() => setOnglet(o)}
-              style={{
-                padding: '8px 16px', border: 'none', background: 'none',
-                fontSize: 13, cursor: 'pointer', fontWeight: 500,
-                color: onglet === o ? '#185FA5' : '#6C757D',
-                borderBottom: onglet === o ? '2px solid #185FA5' : '2px solid transparent',
-              }}
+              className={`pb-2 text-sm font-medium border-b-2 cursor-pointer transition-colors ${
+                onglet === o ? 'border-blue-600 text-blue-600 font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
             >
               {o === 'creances' ? '⚠️ Créances' : '✅ Transactions'}
             </button>
@@ -562,44 +517,35 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
         </div>
 
         {onglet === 'creances' && (
-          <>
+          <div className="space-y-3">
             {/* Recherche par élève ou classe */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="search"
                 placeholder="Rechercher par élève ou classe…"
                 value={recherche}
                 onChange={e => setRecherche(e.target.value)}
-                style={{
-                  flex: 1, minWidth: 180, padding: '7px 12px',
-                  border: '0.5px solid #DEE2E6', borderRadius: 8,
-                  fontSize: 13, background: '#fff', outline: 'none',
-                }}
+                className="flex-1 p-2 border border-slate-200 rounded-lg text-sm bg-white outline-none focus:border-blue-500"
               />
-              {(['tous', 'retard', 'en_attente', 'partiel', 'paye'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFiltreStatut(f)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 20, border: '0.5px solid #DEE2E6',
-                    fontSize: 11, cursor: 'pointer',
-                    background: filtreStatut === f ? '#1B3A5C' : '#fff',
-                    color: filtreStatut === f ? '#fff' : '#6C757D',
-                    fontWeight: 500,
-                  }}
-                >
-                  {{ tous: 'Tous', retard: 'En retard', en_attente: 'En attente', partiel: 'Partiel', paye: 'Payés' }[f]}
-                </button>
-              ))}
+              <div className="flex flex-wrap gap-1">
+                {(['tous', 'retard', 'en_attente', 'partiel', 'paye'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltreStatut(f)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                      filtreStatut === f ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {{ tous: 'Tous', retard: 'En retard', en_attente: 'En attente', partiel: 'Partiel', paye: 'Payés' }[f]}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Liste des créances */}
-            <div style={{
-              background: '#fff', border: '0.5px solid #DEE2E6',
-              borderRadius: 12, overflow: 'hidden',
-            }}>
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs divide-y divide-slate-100">
               {creancesFiltrees.length === 0 ? (
-                <div style={{ padding: 32, textAlign: 'center', color: '#6C757D', fontSize: 13 }}>
+                <div className="p-8 text-center text-slate-500 text-sm">
                   Aucun élève trouvé.
                 </div>
               ) : (
@@ -617,59 +563,49 @@ export default function Scolarite({ ecoleId, onBack, isOnline }: ScolariteProps)
             </div>
 
             {relancesEnvoyees.size > 0 && (
-              <p style={{
-                fontSize: 12, color: '#15803D', textAlign: 'center', marginTop: 12,
-                background: '#DCFCE7', borderRadius: 8, padding: '8px 14px',
-              }}>
+              <p className="text-xs text-emerald-800 text-center bg-emerald-100 rounded-lg p-2.5">
                 💬 {relancesEnvoyees.size} relance{relancesEnvoyees.size > 1 ? 's' : ''} WhatsApp initiée{relancesEnvoyees.size > 1 ? 's' : ''} avec succès.
               </p>
             )}
-          </>
+          </div>
         )}
 
         {onglet === 'transactions' && (
-          <div style={{
-            background: '#fff', border: '0.5px solid #DEE2E6',
-            borderRadius: 12, overflow: 'hidden',
-          }}>
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs divide-y divide-slate-100">
             {creances.filter(c => c.totalPaye > 0).length === 0 ? (
-              <div style={{ padding: 32, textAlign: 'center', color: '#6C757D', fontSize: 13 }}>
+              <div className="p-8 text-center text-slate-500 text-sm">
                 Aucune transaction enregistrée.
               </div>
             ) : (
-              creances.filter(c => c.totalPaye > 0).map((creance, idx, arr) => {
+              creances.filter(c => c.totalPaye > 0).map((creance) => {
                 const p = creance.paiements[0] || { provider: 'especes', reference: 'N/A' };
                 const providerKey = p.provider in PROVIDER_LABELS ? p.provider : 'especes';
                 const nomClasse = mapClasses[creance.eleve.classeId] || 'Classe N/A';
                 
                 return (
-                  <div key={creance.eleveId} style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '10px 14px',
-                    borderBottom: idx < arr.length - 1 ? '0.5px solid #F0F0F0' : 'none',
-                  }}>
-                    <span style={{ fontSize: 18 }}>
+                  <div key={creance.eleveId} className="flex items-center gap-3 p-3.5">
+                    <span className="text-xl">
                       {{ orange_money: '🟠', wave: '🔵', mtn_money: '🟡', moov_money: '🟢', carte_bancaire: '💳', especes: '💵' }[providerKey] || '💵'}
                     </span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-slate-900 truncate">
                         {creance.eleve.nom} {creance.eleve.prenom}
                       </div>
-                      <div style={{ fontSize: 11, color: '#6C757D' }}>
+                      <div className="text-xs text-slate-500 truncate">
                         {nomClasse} • {PROVIDER_LABELS[providerKey] || p.provider} • Réf. {p.reference}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1D9E75' }}>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-semibold text-emerald-600">
                         +{formatXOF(creance.totalPaye)}
                       </div>
                       {p.datePaiement && (
-                        <div style={{ fontSize: 10, color: '#ADB5BD' }}>
+                        <div className="text-[10px] text-slate-400">
                           {new Date(p.datePaiement).toLocaleDateString('fr-FR')}
                         </div>
                       )}
                     </div>
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#EAF3DE', color: '#27500A', fontWeight: 500 }}>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium shrink-0">
                       ✓ Payé
                     </span>
                   </div>
