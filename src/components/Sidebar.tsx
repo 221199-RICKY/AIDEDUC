@@ -36,68 +36,74 @@ export default function Sidebar({
 }: SidebarProps) {
   const handleSelectTab = (tabId: string) => {
     setCurrentTab(tabId)
-    onClose() // Ferme le menu sur mobile lors de la sélection d'un onglet
+    onClose()
   }
 
   return (
     <>
-      {/* ── OVERLAY SOMBRE SUR MOBILE QUAND LE MENU EST OUVERT ── */}
+      {/* OVERLAY SOMBRE MOBILE */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* ── BARRE LATÉRALE / DRAWER ── */}
+      {/* SIDEBAR RESPONSIVE */}
       <aside
         className={`
-          fixed top-0 bottom-0 left-0 z-50 w-72 bg-slate-800 text-white p-6 flex flex-col justify-between
-          transition-transform duration-300 ease-in-out
-          md:static md:translate-x-0
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          bg-slate-800 text-white p-5 flex flex-col justify-between z-50
+          md:w-64 md:flex-shrink-0 md:min-h-screen md:flex md:static
+          ${
+            isOpen
+              ? 'fixed inset-0 w-full h-full bg-slate-900 overflow-y-auto flex'
+              : 'hidden md:flex'
+          }
         `}
       >
         <div>
-          {/* Header de la Sidebar + Bouton Fermer sur Mobile */}
-          <div className="pb-5 border-b border-slate-700 mb-6 relative">
-            <button
-              onClick={onClose}
-              className="md:hidden absolute top-0 right-0 text-slate-400 hover:text-white p-1 text-xl"
-              aria-label="Fermer le menu"
-            >
-              ✕
-            </button>
+          {/* HEADER SIDEBAR + BOUTON FERMER SUR MOBILE */}
+          <div className="pb-4 border-b border-slate-700 mb-5 relative flex flex-col items-center">
+            {isOpen && (
+              <button
+                onClick={onClose}
+                className="md:hidden absolute top-0 right-0 text-slate-400 hover:text-white text-2xl font-bold p-1"
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
+            )}
 
-            <div className="flex items-center justify-center py-2">
+            {/* TAILLE D'IMAGE STRICTEMENT LIMITÉE */}
+            <div className="flex items-center justify-center w-full py-2">
               <img
                 src={logoAideduc}
-                alt="AIDEDUC Logo"
-                className="h-auto max-h-24 w-[85%] object-contain"
+                alt="AIDEDUC"
+                className="h-10 w-auto object-contain max-w-full"
               />
             </div>
 
-            <div className="flex flex-col mt-3 text-center">
-              <span className="text-xs text-slate-400 uppercase tracking-wider font-bold">
+            <div className="mt-2 text-center">
+              <span className="text-xs text-slate-400 uppercase tracking-wider font-bold block">
                 Mode {profil}
               </span>
               {currentUser && (
-                <span className="text-xs text-slate-300 mt-1 font-medium">
+                <span className="text-xs text-slate-300 mt-1 font-medium block">
                   👤 {currentUser.prenom} {currentUser.nom}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex flex-col gap-1.5">
+          {/* LISTE D'ONGLETS DE NAVIGATION */}
+          <nav className="flex flex-col gap-1">
             {profil === 'directeur' &&
               ongletsDirecteur.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleSelectTab(tab.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === tab.id ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === tab.id ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   <span className="mr-2">{tab.icon}</span> {tab.label}
@@ -109,8 +115,8 @@ export default function Sidebar({
                 <button
                   key={tab.id}
                   onClick={() => handleSelectTab(tab.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === tab.id ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === tab.id ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   <span className="mr-2">{tab.icon}</span> {tab.label}
@@ -121,32 +127,32 @@ export default function Sidebar({
               <>
                 <button
                   onClick={() => handleSelectTab('comptable/dashboard')}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === 'comptable/dashboard' ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === 'comptable/dashboard' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📊 Tableau de Bord
                 </button>
                 <button
                   onClick={() => handleSelectTab('comptable/encaissement')}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === 'comptable/encaissement' ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === 'comptable/encaissement' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   💵 Saisie Encaissement
                 </button>
                 <button
                   onClick={() => handleSelectTab('comptable/import')}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === 'comptable/import' ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === 'comptable/import' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📥 Import Données Excel
                 </button>
                 <button
                   onClick={() => handleSelectTab('comptable/relances')}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === 'comptable/relances' ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === 'comptable/relances' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📨 Suivi des Relances
@@ -158,24 +164,24 @@ export default function Sidebar({
               <>
                 <button
                   onClick={() => handleSelectTab('enseignant/appel')}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === 'enseignant/appel' ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === 'enseignant/appel' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📝 Faire l'Appel
                 </button>
                 <button
                   onClick={() => handleSelectTab('enseignant/cahier')}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === 'enseignant/cahier' ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === 'enseignant/cahier' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📚 Cahier de Textes
                 </button>
                 <button
                   onClick={() => handleSelectTab('enseignant/notes')}
-                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium transition-colors ${
-                    currentTab === 'enseignant/notes' ? 'bg-slate-900' : 'bg-transparent hover:bg-slate-700/50'
+                  className={`w-full text-left px-3 py-2.5 rounded-md border-none cursor-pointer text-white font-medium text-sm transition-colors ${
+                    currentTab === 'enseignant/notes' ? 'bg-slate-950 font-bold' : 'bg-transparent hover:bg-slate-700/50'
                   }`}
                 >
                   📊 Saisie des Notes
@@ -185,14 +191,14 @@ export default function Sidebar({
           </nav>
         </div>
 
-        {/* Pied de la Sidebar */}
-        <div className="flex flex-col gap-2 pt-4">
+        {/* PIED DE SIDEBAR */}
+        <div className="flex flex-col gap-2 pt-4 mt-6 border-t border-slate-700">
           <button
             onClick={() => {
               onOpenPasswordModal()
               onClose()
             }}
-            className="w-full p-2.5 bg-slate-700 text-slate-200 border-none rounded-md text-xs cursor-pointer hover:bg-slate-600 transition-colors"
+            className="w-full py-2 px-3 bg-slate-700 text-slate-200 border-none rounded-md text-xs cursor-pointer hover:bg-slate-600 transition-colors"
           >
             🔑 Changer mot de passe
           </button>
@@ -202,7 +208,7 @@ export default function Sidebar({
               onLogout()
               onClose()
             }}
-            className="w-full p-2.5 bg-red-600 text-white border-none rounded-md font-semibold cursor-pointer hover:bg-red-700 transition-colors"
+            className="w-full py-2 px-3 bg-red-600 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-red-700 transition-colors"
           >
             🚪 Déconnexion
           </button>
