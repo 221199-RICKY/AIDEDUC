@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './utils/supabaseClient'
 
-// ── IMPORTATION DU LOGO ──
+// ── IMPORTATION DU LOGO & SIDEBAR ──
 import logoAideduc from './assets/Logo AIDEDUC.png'
+import Sidebar from './components/Sidebar'
 
 // Importations des vues Directeur / Administration
 import Dashboard from './components/Dashboard'
@@ -43,6 +44,9 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // État pour le menu mobile responsive
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   // États pour le changement de mot de passe
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -56,7 +60,7 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // États pour le formulaire d'inscription (seuls les 4 rôles sont accessibles)
+  // États pour le formulaire d'inscription
   const [registerForm, setRegisterForm] = useState({
     nom: '',
     prenom: '',
@@ -122,10 +126,8 @@ export default function App() {
 
       const { data: authUser } = await supabase.auth.getUser()
 
-      // Sécurisation du typage vers l'un des 4 rôles autorisés
       const userRole = (profileData.role || 'enseignant') as Profil
 
-      // Construction complète de l'objet User pour respecter l'interface TS
       const utilisateurFormate: User = {
         id: profileData.id,
         nom: profileData.last_name || '',
@@ -279,23 +281,14 @@ export default function App() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          height: '100vh',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'sans-serif',
-          backgroundColor: '#f3f4f6',
-        }}
-      >
-        <div style={{ textAlign: 'center' }}>
+      <div className="flex h-screen items-center justify-center bg-gray-100 font-sans">
+        <div className="text-center">
           <img
             src={logoAideduc}
             alt="AIDEDUC"
-            style={{ height: '140px', width: 'auto', marginBottom: '20px', objectFit: 'contain' }}
+            className="h-36 w-auto mb-5 object-contain mx-auto"
           />
-          <div style={{ color: '#4b5563', fontWeight: '600', fontSize: '16px' }}>
+          <div className="text-gray-600 font-semibold text-base">
             Chargement des données...
           </div>
         </div>
@@ -306,54 +299,23 @@ export default function App() {
   // ÉCRAN DE CONNEXION (LOGIN)
   if (vue === 'connexion') {
     return (
-      <div
-        style={{
-          display: 'flex',
-          minHeight: '100vh',
-          backgroundColor: '#f3f4f6',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          fontFamily: 'sans-serif',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            padding: '40px',
-            borderRadius: '16px',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            maxWidth: '460px',
-            width: '100%',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+      <div className="flex min-h-screen bg-gray-100 items-center justify-center p-5 font-sans">
+        <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center">
+          <div className="flex justify-center mb-6">
             <img
               src={logoAideduc}
               alt="AIDEDUC Logo"
-              style={{ height: 'auto', maxHeight: '180px', width: '85%', objectFit: 'contain' }}
+              className="h-auto max-h-44 w-[85%] object-contain"
             />
           </div>
 
-          <p style={{ color: '#6b7280', fontSize: '15px', marginBottom: '32px', fontWeight: '500' }}>
+          <p className="text-gray-500 text-sm mb-8 font-medium">
             Gestion Scolaire Intégrée — Bénin
           </p>
 
-          <form
-            onSubmit={handleLogin}
-            style={{ display: 'flex', flexDirection: 'column', gap: '18px', textAlign: 'left' }}
-          >
+          <form onSubmit={handleLogin} className="flex flex-col gap-4 text-left">
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '6px',
-                }}
-              >
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Adresse Email
               </label>
               <input
@@ -362,27 +324,12 @@ export default function App() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Ex: directeur@ecole.com"
                 required
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  boxSizing: 'border-box',
-                  fontSize: '14px',
-                }}
+                className="w-full px-3.5 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-800 outline-none"
               />
             </div>
 
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '6px',
-                }}
-              >
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Mot de passe
               </label>
               <input
@@ -391,26 +338,12 @@ export default function App() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  boxSizing: 'border-box',
-                  fontSize: '14px',
-                }}
+                className="w-full px-3.5 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-800 outline-none"
               />
             </div>
 
             {loginError && (
-              <div
-                style={{
-                  color: '#ef4444',
-                  fontSize: '13px',
-                  textAlign: 'center',
-                  fontWeight: '500',
-                }}
-              >
+              <div className="text-red-500 text-xs text-center font-medium">
                 ❌ {loginError}
               </div>
             )}
@@ -418,39 +351,20 @@ export default function App() {
             <button
               type="submit"
               disabled={submitting}
-              style={{
-                width: '100%',
-                padding: '14px',
-                backgroundColor: '#1e3a8a',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '15px',
-                cursor: 'pointer',
-                marginTop: '8px',
-                opacity: submitting ? 0.7 : 1,
-              }}
+              className="w-full py-3.5 bg-blue-900 text-white rounded-lg font-semibold text-sm cursor-pointer mt-2 hover:bg-blue-950 transition-colors disabled:opacity-70"
             >
               {submitting ? 'Connexion en cours...' : '🔐 Se connecter'}
             </button>
           </form>
 
-          <div style={{ marginTop: '24px', fontSize: '14px', color: '#4b5563' }}>
+          <div className="mt-6 text-sm text-gray-600">
             Pas encore de compte ?{' '}
             <button
               onClick={() => {
                 setVue('inscription')
                 setLoginError(null)
               }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#2563eb',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-              }}
+              className="bg-transparent border-none text-blue-600 font-semibold cursor-pointer underline"
             >
               Créer un compte
             </button>
@@ -463,55 +377,24 @@ export default function App() {
   // ÉCRAN D'INSCRIPTION (SIGN UP)
   if (vue === 'inscription') {
     return (
-      <div
-        style={{
-          display: 'flex',
-          minHeight: '100vh',
-          backgroundColor: '#f3f4f6',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '30px 20px',
-          fontFamily: 'sans-serif',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            padding: '36px',
-            borderRadius: '16px',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            maxWidth: '500px',
-            width: '100%',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+      <div className="flex min-h-screen bg-gray-100 items-center justify-center px-5 py-8 font-sans">
+        <div className="bg-white p-9 rounded-2xl shadow-xl max-w-lg w-full text-center">
+          <div className="flex justify-center mb-5">
             <img
               src={logoAideduc}
               alt="AIDEDUC Logo"
-              style={{ height: 'auto', maxHeight: '160px', width: '80%', objectFit: 'contain' }}
+              className="h-auto max-h-40 w-[80%] object-contain"
             />
           </div>
 
-          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
+          <p className="text-gray-500 text-xs mb-6">
             Inscription de l'équipe administrative & pédagogique
           </p>
 
-          <form
-            onSubmit={handleRegister}
-            style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}
-          >
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <div style={{ flex: 1 }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '4px',
-                  }}
-                >
+          <form onSubmit={handleRegister} className="flex flex-col gap-3.5 text-left">
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Prénom
                 </label>
                 <input
@@ -520,25 +403,11 @@ export default function App() {
                   onChange={(e) => setRegisterForm({ ...registerForm, prenom: e.target.value })}
                   placeholder="Jean"
                   required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    boxSizing: 'border-box',
-                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-              <div style={{ flex: 1 }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '4px',
-                  }}
-                >
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Nom
                 </label>
                 <input
@@ -547,27 +416,13 @@ export default function App() {
                   onChange={(e) => setRegisterForm({ ...registerForm, nom: e.target.value })}
                   placeholder="Koffi"
                   required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    boxSizing: 'border-box',
-                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '4px',
-                }}
-              >
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Code d'invitation de l'école
               </label>
               <input
@@ -576,41 +431,18 @@ export default function App() {
                 onChange={(e) => setRegisterForm({ ...registerForm, codeEcole: e.target.value })}
                 placeholder="Ex: EXCEL-2026"
                 required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid #2563eb',
-                  borderRadius: '8px',
-                  backgroundColor: '#eff6ff',
-                  fontWeight: '600',
-                  boxSizing: 'border-box',
-                }}
+                className="w-full px-3 py-2.5 border border-blue-600 rounded-lg bg-blue-50 font-semibold text-sm"
               />
             </div>
 
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '4px',
-                }}
-              >
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Rôle au sein de l'établissement
               </label>
               <select
                 value={registerForm.role}
                 onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value as Profil })}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff',
-                  boxSizing: 'border-box',
-                }}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-sm"
               >
                 <option value="enseignant">Enseignant</option>
                 <option value="censeur">Censeur</option>
@@ -620,15 +452,7 @@ export default function App() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '4px',
-                }}
-              >
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Adresse Email
               </label>
               <input
@@ -637,26 +461,12 @@ export default function App() {
                 onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                 placeholder="jean.koffi@ecole.com"
                 required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  boxSizing: 'border-box',
-                }}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
               />
             </div>
 
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '4px',
-                }}
-              >
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Mot de passe
               </label>
               <input
@@ -666,23 +476,17 @@ export default function App() {
                 placeholder="•••••••• (6 caractères min)"
                 minLength={6}
                 required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  boxSizing: 'border-box',
-                }}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
               />
             </div>
 
             {loginError && (
-              <div style={{ color: '#ef4444', fontSize: '13px', fontWeight: '500', textAlign: 'center' }}>
+              <div className="text-red-500 text-xs font-medium text-center">
                 ❌ {loginError}
               </div>
             )}
             {registerSuccess && (
-              <div style={{ color: '#16a34a', fontSize: '13px', fontWeight: '500', textAlign: 'center' }}>
+              <div className="text-green-600 text-xs font-medium text-center">
                 ✓ {registerSuccess}
               </div>
             )}
@@ -690,39 +494,20 @@ export default function App() {
             <button
               type="submit"
               disabled={submitting}
-              style={{
-                width: '100%',
-                padding: '12px',
-                backgroundColor: '#1e3a8a',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: 'pointer',
-                marginTop: '4px',
-                opacity: submitting ? 0.7 : 1,
-              }}
+              className="w-full py-3 bg-blue-900 text-white rounded-lg font-semibold text-sm cursor-pointer mt-1 hover:bg-blue-950 transition-colors disabled:opacity-70"
             >
               {submitting ? 'Création du compte...' : '🚀 Créer mon compte'}
             </button>
           </form>
 
-          <div style={{ marginTop: '20px', fontSize: '14px', color: '#4b5563' }}>
+          <div className="mt-5 text-sm text-gray-600">
             Déjà inscrit ?{' '}
             <button
               onClick={() => {
                 setVue('connexion')
                 setLoginError(null)
               }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#2563eb',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-              }}
+              className="bg-transparent border-none text-blue-600 font-semibold cursor-pointer underline"
             >
               Se connecter
             </button>
@@ -734,312 +519,53 @@ export default function App() {
 
   // INTERFACE PRINCIPALE DE L'APPLICATION
   return (
-    <div
-      style={{
-        display: 'flex',
-        minHeight: '100vh',
-        fontFamily: 'sans-serif',
-        backgroundColor: '#f9fafb',
-      }}
-    >
-      {/* ── BARRE LATÉRALE DE NAVIGATION (SIDEBAR) ── */}
-      <div
-        style={{
-          width: '280px',
-          backgroundColor: '#1e293b',
-          color: '#ffffff',
-          padding: '24px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              paddingBottom: '20px',
-              borderBottom: '1px solid #334155',
-              marginBottom: '24px',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '8px 0',
-              }}
-            >
-              <img
-                src={logoAideduc}
-                alt="AIDEDUC Logo"
-                style={{ height: 'auto', maxHeight: '100px', width: '85%', objectFit: 'contain' }}
-              />
-            </div>
-
-            <div
-              style={{ display: 'flex', flexDirection: 'column', marginTop: '14px', textAlign: 'center' }}
-            >
-              <span
-                style={{
-                  fontSize: '12px',
-                  color: '#94a3b8',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  fontWeight: 'bold',
-                }}
-              >
-                Mode {profil}
-              </span>
-              {currentUser && (
-                <span style={{ fontSize: '12px', color: '#cbd5e1', marginTop: '4px', fontWeight: '500' }}>
-                  👤 {currentUser.prenom} {currentUser.nom}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {profil === 'directeur' &&
-              ongletsDirecteur.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setCurrentTab(tab.id)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '11px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: currentTab === tab.id ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  <span style={{ marginRight: '8px' }}>{tab.icon}</span> {tab.label}
-                </button>
-              ))}
-
-            {profil === 'censeur' &&
-              ongletsCenseur.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setCurrentTab(tab.id)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '11px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: currentTab === tab.id ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  <span style={{ marginRight: '8px' }}>{tab.icon}</span> {tab.label}
-                </button>
-              ))}
-
-            {profil === 'comptable' && (
-              <>
-                <button
-                  onClick={() => setCurrentTab('comptable/dashboard')}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor:
-                      currentTab === 'comptable/dashboard' ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  📊 Tableau de Bord
-                </button>
-                <button
-                  onClick={() => setCurrentTab('comptable/encaissement')}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor:
-                      currentTab === 'comptable/encaissement' ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  💵 Saisie Encaissement
-                </button>
-                <button
-                  onClick={() => setCurrentTab('comptable/import')}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor:
-                      currentTab === 'comptable/import' ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  📥 Import Données Excel
-                </button>
-                <button
-                  onClick={() => setCurrentTab('comptable/relances')}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor:
-                      currentTab === 'comptable/relances' ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  📨 Suivi des Relances
-                </button>
-              </>
-            )}
-
-            {profil === 'enseignant' && (
-              <>
-                <button
-                  onClick={() => setCurrentTab('enseignant/appel')}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: currentTab === 'enseignant/appel' ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  📝 Faire l'Appel
-                </button>
-                <button
-                  onClick={() => setCurrentTab('enseignant/cahier')}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: currentTab === 'enseignant/cahier' ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  📚 Cahier de Textes
-                </button>
-                <button
-                  onClick={() => setCurrentTab('enseignant/notes')}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: currentTab === 'enseignant/notes' ? '#0f172a' : 'transparent',
-                    color: '#ffffff',
-                    fontWeight: '500',
-                  }}
-                >
-                  📊 Saisie des Notes
-                </button>
-              </>
-            )}
-          </nav>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div className="flex min-h-screen font-sans bg-gray-50 flex-col md:flex-row">
+      {/* ── EN-TÊTE MOBILE (HEADER HAMBURGER) ── */}
+      <header className="md:hidden bg-slate-800 text-white px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-md">
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowPasswordModal(true)}
-            style={{
-              width: '100%',
-              padding: '9px',
-              backgroundColor: '#334155',
-              color: '#cbd5e1',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="text-2xl text-white p-1 hover:bg-slate-700 rounded transition-colors"
+            aria-label="Ouvrir le menu"
           >
-            🔑 Changer mot de passe
+            ☰
           </button>
-
-          <button
-            onClick={handleLogout}
-            style={{
-              width: '100%',
-              padding: '10px',
-              backgroundColor: '#ef4444',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            🚪 Déconnexion
-          </button>
+          <img src={logoAideduc} alt="AIDEDUC" className="h-8 w-auto object-contain" />
         </div>
-      </div>
+        <span className="text-xs uppercase bg-slate-700 px-2 py-1 rounded font-bold text-slate-300">
+          {profil}
+        </span>
+      </header>
+
+      {/* ── SIDEBAR COMPONENT ── */}
+      <Sidebar
+        profil={profil}
+        currentUser={currentUser}
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        ongletsDirecteur={ongletsDirecteur}
+        ongletsCenseur={ongletsCenseur}
+        onOpenPasswordModal={() => setShowPasswordModal(true)}
+        onLogout={handleLogout}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
 
       {/* ── ZONE DE RENDU DYNAMIQUE PRINCIPALE ── */}
-      <div style={{ flex: 1, padding: '30px', overflowY: 'auto', position: 'relative' }}>
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto relative">
         {/* BANNIÈRE D'INVITATION SÉCURITÉ POUR LE DIRECTEUR */}
         {profil === 'directeur' && (
-          <div
-            style={{
-              backgroundColor: '#fef3c7',
-              border: '1px solid #f59e0b',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              marginBottom: '20px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '18px' }}>🛡️</span>
-              <span style={{ color: '#92400e', fontSize: '14px', fontWeight: '500' }}>
+          <div className="bg-amber-100 border border-amber-500 rounded-lg p-3 md:p-4 mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="text-lg">🛡️</span>
+              <span className="text-amber-900 text-xs md:text-sm font-medium">
                 Premier accès ? Pour des raisons de sécurité, nous vous recommandons de modifier
                 votre mot de passe temporaire.
               </span>
             </div>
             <button
               onClick={() => setShowPasswordModal(true)}
-              style={{
-                backgroundColor: '#d97706',
-                color: '#ffffff',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
+              className="bg-amber-600 text-white border-none px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-700 whitespace-nowrap self-end sm:self-auto"
             >
               Changer mon mot de passe
             </button>
@@ -1063,10 +589,10 @@ export default function App() {
 
             {currentTab === 'suivi_absences' && (
               <Absences
-              ecoleId={currentUser?.ecoleId || ''}
-               onBack={() => setCurrentTab('vue_globale')}
-               isOnline={navigator.onLine}
-               />
+                ecoleId={currentUser?.ecoleId || ''}
+                onBack={() => setCurrentTab('vue_globale')}
+                isOnline={navigator.onLine}
+              />
             )}
 
             {currentTab === 'affectations_cours' && (
@@ -1079,58 +605,27 @@ export default function App() {
         {profil === 'censeur' && (
           <>
             {currentTab === 'tableau_pedagogique' && (
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  padding: '24px',
-                  borderRadius: '8px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                }}
-              >
-                <h2 style={{ marginTop: 0, color: '#0f172a' }}>🏫 Tableau de Bord Pédagogique</h2>
-                <p style={{ color: '#4b5563' }}>
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <h2 className="mt-0 text-slate-900 text-xl font-bold">🏫 Tableau de Bord Pédagogique</h2>
+                <p className="text-gray-600 text-sm">
                   Bienvenue dans l'espace opérationnel du Censeur.
                 </p>
-                <div style={{ marginTop: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div className="mt-5 flex gap-3 flex-wrap">
                   <button
                     onClick={() => setCurrentTab('affectations_cours')}
-                    style={{
-                      padding: '10px 16px',
-                      backgroundColor: '#10b981',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
+                    className="px-4 py-2.5 bg-emerald-600 text-white border-none rounded-md font-semibold cursor-pointer text-sm hover:bg-emerald-700"
                   >
                     🤝 Affectation des Cours
                   </button>
                   <button
                     onClick={() => setCurrentTab('gestion_absences')}
-                    style={{
-                      padding: '10px 16px',
-                      backgroundColor: '#2563eb',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
+                    className="px-4 py-2.5 bg-blue-600 text-white border-none rounded-md font-semibold cursor-pointer text-sm hover:bg-blue-700"
                   >
                     📝 Gestion des Absences
                   </button>
                   <button
                     onClick={() => setCurrentTab('suivi_cours')}
-                    style={{
-                      padding: '10px 16px',
-                      backgroundColor: '#0f172a',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
+                    className="px-4 py-2.5 bg-slate-900 text-white border-none rounded-md font-semibold cursor-pointer text-sm hover:bg-slate-800"
                   >
                     📖 Suivi des Cours
                   </button>
@@ -1141,11 +636,11 @@ export default function App() {
               <AffectationsCours onBack={() => setCurrentTab('tableau_pedagogique')} />
             )}
             {currentTab === 'gestion_absences' && (
-            <Absences 
-             ecoleId={currentUser?.ecoleId || ''} 
-             onBack={() => setCurrentTab('tableau_pedagogique')} 
-             isOnline={navigator.onLine} 
-            />
+              <Absences 
+                ecoleId={currentUser?.ecoleId || ''} 
+                onBack={() => setCurrentTab('tableau_pedagogique')} 
+                isOnline={navigator.onLine} 
+              />
             )}
             {currentTab === 'suivi_cours' && (
               <SuiviCours onBack={() => setCurrentTab('tableau_pedagogique')} />
@@ -1177,52 +672,19 @@ export default function App() {
             )}
           </>
         )}
-      </div>
+      </main>
 
       {/* ── MODALE CHANGER LE MOT DE PASSE ── */}
       {showPasswordModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              padding: '28px',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '400px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 16px 0', color: '#1e3a8a', fontSize: '18px' }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-7 rounded-xl max-w-md w-full shadow-2xl">
+            <h3 className="m-0 mb-4 text-blue-900 text-lg font-bold">
               🔑 Modifier votre mot de passe
             </h3>
 
-            <form
-              onSubmit={handlePasswordUpdate}
-              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-            >
+            <form onSubmit={handlePasswordUpdate} className="flex flex-col gap-3">
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '4px',
-                  }}
-                >
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Nouveau mot de passe
                 </label>
                 <input
@@ -1231,26 +693,12 @@ export default function App() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    boxSizing: 'border-box',
-                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '4px',
-                  }}
-                >
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Confirmer le nouveau mot de passe
                 </label>
                 <input
@@ -1259,44 +707,26 @@ export default function App() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    boxSizing: 'border-box',
-                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
 
               {passwordMsg && (
                 <div
-                  style={{
-                    color: passwordMsg.type === 'error' ? '#ef4444' : '#16a34a',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    textAlign: 'center',
-                  }}
+                  className={`text-xs font-medium text-center ${
+                    passwordMsg.type === 'error' ? 'text-red-500' : 'text-green-600'
+                  }`}
                 >
                   {passwordMsg.type === 'error' ? '❌ ' : '✓ '}
                   {passwordMsg.text}
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+              <div className="flex gap-2.5 mt-3">
                 <button
                   type="submit"
                   disabled={passwordLoading}
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    backgroundColor: '#1e3a8a',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
+                  className="flex-1 py-2.5 bg-blue-900 text-white border-none rounded-lg font-semibold cursor-pointer hover:bg-blue-950 transition-colors"
                 >
                   {passwordLoading ? 'Mise à jour...' : 'Enregistrer'}
                 </button>
@@ -1306,15 +736,7 @@ export default function App() {
                     setShowPasswordModal(false)
                     setPasswordMsg(null)
                   }}
-                  style={{
-                    padding: '10px 14px',
-                    backgroundColor: '#f3f4f6',
-                    color: '#374151',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                  }}
+                  className="px-3.5 py-2.5 bg-gray-100 text-gray-700 border-none rounded-lg font-medium cursor-pointer hover:bg-gray-200"
                 >
                   Annuler
                 </button>
