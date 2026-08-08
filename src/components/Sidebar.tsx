@@ -44,7 +44,7 @@ export default function Sidebar({
       {/* OVERLAY SOMBRE MOBILE */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 z-[99998] md:hidden"
           onClick={onClose}
         />
       )}
@@ -52,11 +52,11 @@ export default function Sidebar({
       {/* SIDEBAR RESPONSIVE */}
       <aside
         className={`
-          bg-slate-800 text-white p-5 flex flex-col justify-between z-50
-          md:w-64 md:flex-shrink-0 md:min-h-screen md:static
+          bg-slate-800 text-white p-5 flex flex-col justify-between
+          md:w-64 md:flex-shrink-0 md:min-h-screen md:static md:z-auto
           ${
             isOpen
-              ? 'fixed inset-0 w-full bg-slate-900 flex flex-col'
+              ? 'fixed inset-0 w-full bg-slate-900 flex flex-col z-[99999] overflow-y-auto'
               : 'hidden md:flex'
           }
         `}
